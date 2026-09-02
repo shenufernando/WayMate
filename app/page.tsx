@@ -11,22 +11,22 @@ export default function Home() {
   const costPerPerson = totalCost && people > 0 ? (Number(totalCost) / people).toFixed(2) : 0;
 
   return (
-    <main className="min-h-screen bg-slate-950 text-white pb-20 relative">
-      {/* High Quality Scenic Sri Lanka Travel Background */}
+    <main className="min-h-screen bg-slate-950 text-white pb-20 relative overflow-hidden">
+      {/* Scenic Sri Lanka Travel Background - Adjusted for Better Brightness */}
       <div 
-        className="absolute inset-0 bg-cover bg-center bg-no-repeat opacity-40 h-[700px] pointer-events-none"
+        className="absolute inset-0 bg-cover bg-center bg-no-repeat opacity-65 h-[650px] pointer-events-none z-0"
         style={{
           backgroundImage: `url('https://images.unsplash.com/photo-1546708973-b339540b5162?q=80&w=1920&auto=format&fit=crop')`,
         }}
       >
-        {/* Soft Radial Overlay to make text clear while keeping background visible */}
-        <div className="absolute inset-0 bg-gradient-to-b from-slate-950/40 via-slate-950/70 to-slate-950" />
+        {/* Lighter Gradient Overlay */}
+        <div className="absolute inset-0 bg-gradient-to-b from-slate-950/20 via-slate-950/40 to-slate-950" />
       </div>
 
       {/* Content Layer */}
       <div className="relative z-10">
         {/* Navigation */}
-        <nav className="flex justify-between items-center px-8 py-5 border-b border-slate-800/80 backdrop-blur-md bg-slate-950/50">
+        <nav className="flex justify-between items-center px-8 py-5 border-b border-slate-800/80 backdrop-blur-md bg-slate-950/40">
           <h1 className="text-2xl font-bold tracking-wider text-emerald-400">
             Way<span className="text-cyan-400">Mate</span>
           </h1>
@@ -44,27 +44,27 @@ export default function Home() {
 
         {/* Hero Section */}
         <section className="flex flex-col items-center justify-center text-center mt-16 px-4">
-          <span className="bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 px-4 py-1.5 rounded-full text-sm font-semibold mb-4 backdrop-blur-md shadow-lg">
+          <span className="bg-emerald-500/20 text-emerald-300 border border-emerald-400/40 px-4 py-1.5 rounded-full text-sm font-semibold mb-4 backdrop-blur-md shadow-lg">
             🌟 Travel Together & Save Costs Across Sri Lanka
           </span>
-          <h2 className="text-5xl md:text-6xl font-extrabold leading-tight max-w-4xl tracking-tight drop-shadow-md">
+          <h2 className="text-5xl md:text-6xl font-extrabold leading-tight max-w-4xl tracking-tight drop-shadow-xl">
             Smart Travel & <span className="text-emerald-400">Cost Sharing</span> Made Easy
           </h2>
-          <p className="text-slate-200 mt-4 max-w-xl text-lg font-normal drop-shadow">
+          <p className="text-slate-100 mt-4 max-w-xl text-lg font-medium drop-shadow-md">
             Plan your route, find travel mates, split expenses, and get AI-powered itineraries for your next adventure.
           </p>
 
           {/* Search Bar */}
-          <div className="bg-slate-900/90 backdrop-blur-md p-4 rounded-xl shadow-2xl mt-8 flex flex-col md:flex-row gap-4 w-full max-w-2xl border border-slate-700/80">
+          <div className="bg-slate-900/85 backdrop-blur-md p-4 rounded-xl shadow-2xl mt-8 flex flex-col md:flex-row gap-4 w-full max-w-2xl border border-slate-700/80">
             <input 
               type="text" 
               placeholder="From (e.g. Colombo)" 
-              className="bg-slate-950 border border-slate-700/80 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-emerald-400 flex-1 placeholder:text-slate-400"
+              className="bg-slate-950/90 border border-slate-700/80 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-emerald-400 flex-1 placeholder:text-slate-400"
             />
             <input 
               type="text" 
               placeholder="To (e.g. Ella)" 
-              className="bg-slate-950 border border-slate-700/80 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-emerald-400 flex-1 placeholder:text-slate-400"
+              className="bg-slate-950/90 border border-slate-700/80 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-emerald-400 flex-1 placeholder:text-slate-400"
             />
             <Link 
               href="/routes"
