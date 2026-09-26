@@ -1,41 +1,18 @@
 "use client";
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 
-const initialRides = [
-  {
-    id: 1,
-    driver: "Kasun Perera",
-    from: "Colombo",
-    to: "Ella",
-    date: "2026-09-25",
-    seatsLeft: 2,
-    pricePerSeat: 2500,
-    vehicle: "Car (AC)",
-    rating: "4.9",
-  },
-  {
-    id: 2,
-    driver: "Dilini Silva",
-    from: "Kandy",
-    to: "Galle",
-    date: "2026-09-26",
-    seatsLeft: 3,
-    pricePerSeat: 1800,
-    vehicle: "Van (AC)",
-    rating: "4.8",
-  },
-  {
-    id: 3,
-    driver: "Nimal Fernando",
-    from: "Colombo",
-    to: "Arugam Bay",
-    date: "2026-09-28",
-    seatsLeft: 1,
-    pricePerSeat: 3500,
-    vehicle: "SUV",
-    rating: "5.0",
-  },
-];
+interface Ride {
+  _id: string;
+  driver: string;
+  from: string;
+  to: string;
+  date: string;
+  seatsLeft: number;
+  pricePerSeat: number;
+  vehicle: string;
+  rating?: string;
+}
 
 interface BlogPost {
   id: number;
@@ -46,16 +23,58 @@ interface BlogPost {
 }
 
 export default function Home() {
+  const router = useRouter();
   const [totalCost, setTotalCost] = useState<number | "">(10000);
   const [people, setPeople] = useState<number>(4);
   const [isAuthOpen, setIsAuthOpen] = useState<boolean>(false);
   const [authMode, setAuthMode] = useState<"signin" | "signup">("signin");
+  const [showPassword, setShowPassword] = useState<boolean>(false);
+
+  // Auth Form State
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [fullName, setFullName] = useState("");
+  const [authLoading, setAuthLoading] = useState(false);
+
   const [fromSearch, setFromSearch] = useState("");
   const [toSearch, setToSearch] = useState("");
   const [travelDate, setTravelDate] = useState("");
-  const [rides] = useState(initialRides);
+
+  // Rides backend එකෙන් ලබා ගැනීම සඳහා State එක
+  const [rides, setRides] = useState<Ride[]>([]);
+  const [loadingRides, setLoadingRides] = useState<boolean>(true);
+
   const [blogs, setBlogs] = useState<BlogPost[]>([]);
   const [loadingBlogs, setLoadingBlogs] = useState<boolean>(true);
+
+  // Backend API එකෙන් Rides දත්ත ලබා ගැනීම (Fetch)
+  useEffect(() => {
+    fetch("http://localhost:5000/api/rides")
+      .then((res) => res.json())
+      .then((data) => {
+        if (Array.isArray(data)) {
+          setRides(data);
+        }
+        setLoadingRides(false);
+      })
+      .catch((err) => {
+        console.error("Error fetching rides:", err);
+        setLoadingRides(false);
+      });
+  }, []);
+
+  // News/Blogs Fetch කිරීම
+  useEffect(() => {
+    fetch("https://techcrunch.com/wp-json/wp/v2/posts?per_page=3")
+      .then((res) => res.json())
+      .then((data) => {
+        if (Array.isArray(data)) {
+          setBlogs(data);
+        }
+        setLoadingBlogs(false);
+      })
+      .catch(() => setLoadingBlogs(false));
+  }, []);
 
   const costPerPerson =
     totalCost && people > 0 ? (Number(totalCost) / people).toFixed(2) : "0.00";
@@ -69,29 +88,77 @@ export default function Home() {
     return matchesFrom && matchesTo && matchesDate;
   });
 
-  useEffect(() => {
-    fetch("https://techcrunch.com/wp-json/wp/v2/posts?per_page=3")
-      .then((res) => res.json())
-      .then((data) => {
-        if (Array.isArray(data)) {
-          setBlogs(data);
+  // Auth Submit Handle කිරීම සහ Dashboard Redirect Logic එක
+  const handleAuthSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setAuthLoading(true);
+
+    // Hardcoded Admin Check (Optional Quick Check)
+    if (authMode === "signin" && email === "admin@gmail.com" && password === "admin123") {
+      localStorage.setItem("userRole", "admin");
+      localStorage.setItem("userEmail", email);
+      router.push("/admin");
+      setAuthLoading(false);
+      return;
+    }
+
+    try {
+      const endpoint =
+        authMode === "signin"
+          ? "http://localhost:5000/api/auth/login"
+          : "http://localhost:5000/api/auth/register";
+
+      const payload =
+        authMode === "signup"
+          ? { name: fullName, email, password }
+          : { email, password };
+
+      const res = await fetch(endpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      const data = await res.json();
+
+      if (res.ok) {
+        if (data.token) localStorage.setItem("token", data.token);
+        localStorage.setItem("userRole", data.user?.role || "user");
+        localStorage.setItem("userName", data.user?.name || fullName);
+        localStorage.setItem("userEmail", data.user?.email || email);
+
+        setIsAuthOpen(false);
+
+        if (data.user?.role === "admin" || email === "admin@gmail.com") {
+          router.push("/admin");
+        } else {
+          router.push("/user");
         }
-        setLoadingBlogs(false);
-      })
-      .catch(() => setLoadingBlogs(false));
-  }, []);
+      } else {
+        alert(data.message || "Authentication failed!");
+      }
+    } catch (error) {
+      console.error("Auth Error:", error);
+      // Backend එක නැති විට Demo Mode redirection
+      if (email === "admin@gmail.com") {
+        router.push("/admin");
+      } else {
+        router.push("/user");
+      }
+    } finally {
+      setAuthLoading(false);
+    }
+  };
 
   return (
     <main className="min-h-screen bg-slate-50 text-slate-900 relative overflow-hidden flex flex-col justify-between font-sans">
       <div>
         {/* Navigation Bar */}
         <nav className="flex justify-between items-center px-8 py-4 bg-white/80 backdrop-blur-lg sticky top-0 z-40 border-b border-slate-200/60 shadow-sm">
-          {/* Logo Left */}
           <h1 className="text-2xl font-black tracking-tight text-emerald-600 w-1/4 flex items-center gap-1">
             Way<span className="text-teal-500">Mate</span>
           </h1>
 
-          {/* Links Centered */}
           <div className="flex items-center justify-center space-x-8 text-sm font-semibold text-slate-600 w-2/4">
             <a href="#features" className="hover:text-emerald-600 transition-colors">
               Features
@@ -107,14 +174,13 @@ export default function Home() {
             </a>
           </div>
 
-          {/* Button Right */}
           <div className="flex justify-end w-1/4">
             <button
               onClick={() => {
                 setAuthMode("signin");
                 setIsAuthOpen(true);
               }}
-              className="bg-slate-900 hover:bg-emerald-600 text-white px-5 py-2.5 rounded-xl font-bold transition-all duration-300 shadow-sm hover:shadow-emerald-600/20 text-xs tracking-wide"
+              className="bg-emerald-600 hover:bg-slate-900 active:bg-slate-900 text-white px-5 py-2.5 rounded-xl font-bold transition-all duration-300 shadow-sm hover:shadow-slate-900/20 text-xs tracking-wide"
             >
               Sign In
             </button>
@@ -147,7 +213,7 @@ export default function Home() {
               Plan your route, find travel mates, split expenses, and explore Sri Lanka together seamlessly.
             </p>
 
-            {/* Floating Search Card */}
+            {/* Search Box */}
             <div className="bg-white/95 backdrop-blur-xl p-3.5 rounded-2xl shadow-2xl mt-10 flex flex-col md:flex-row gap-3 w-full max-w-4xl border border-white/40">
               <input
                 type="text"
@@ -179,7 +245,7 @@ export default function Home() {
           </section>
         </div>
 
-        {/* Updated Professional Features Section */}
+        {/* Features Section */}
         <section id="features" className="mt-28 pt-8 px-6 max-w-7xl mx-auto relative z-20">
           <div className="text-center max-w-3xl mx-auto mb-16">
             <span className="text-emerald-600 font-bold text-xs uppercase tracking-widest bg-emerald-50 px-4 py-1.5 rounded-full border border-emerald-200 inline-block mb-3 shadow-sm">
@@ -194,7 +260,6 @@ export default function Home() {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
-            {/* Feature 1 */}
             <div className="group relative bg-white rounded-3xl p-8 border border-slate-200/70 shadow-sm hover:shadow-2xl hover:-translate-y-2 transition-all duration-300 flex flex-col justify-between overflow-hidden">
               <div className="absolute top-0 right-0 w-28 h-28 bg-emerald-500/5 rounded-bl-full -mr-4 -mt-4 transition-all duration-300 group-hover:scale-110 group-hover:bg-emerald-500/10" />
               <div>
@@ -213,7 +278,6 @@ export default function Home() {
               </div>
             </div>
 
-            {/* Feature 2 */}
             <div className="group relative bg-white rounded-3xl p-8 border border-slate-200/70 shadow-sm hover:shadow-2xl hover:-translate-y-2 transition-all duration-300 flex flex-col justify-between overflow-hidden">
               <div className="absolute top-0 right-0 w-28 h-28 bg-emerald-500/5 rounded-bl-full -mr-4 -mt-4 transition-all duration-300 group-hover:scale-110 group-hover:bg-emerald-500/10" />
               <div>
@@ -232,7 +296,6 @@ export default function Home() {
               </div>
             </div>
 
-            {/* Feature 3 */}
             <div className="group relative bg-white rounded-3xl p-8 border border-slate-200/70 shadow-sm hover:shadow-2xl hover:-translate-y-2 transition-all duration-300 flex flex-col justify-between overflow-hidden">
               <div className="absolute top-0 right-0 w-28 h-28 bg-emerald-500/5 rounded-bl-full -mr-4 -mt-4 transition-all duration-300 group-hover:scale-110 group-hover:bg-emerald-500/10" />
               <div>
@@ -251,7 +314,6 @@ export default function Home() {
               </div>
             </div>
 
-            {/* Feature 4 */}
             <div className="group relative bg-white rounded-3xl p-8 border border-slate-200/70 shadow-sm hover:shadow-2xl hover:-translate-y-2 transition-all duration-300 flex flex-col justify-between overflow-hidden">
               <div className="absolute top-0 right-0 w-28 h-28 bg-emerald-500/5 rounded-bl-full -mr-4 -mt-4 transition-all duration-300 group-hover:scale-110 group-hover:bg-emerald-500/10" />
               <div>
@@ -272,7 +334,7 @@ export default function Home() {
           </div>
         </section>
 
-        {/* Available Rides & Travel Mates */}
+        {/* Available Rides Section */}
         <section id="routes" className="mt-32 px-4 max-w-6xl mx-auto">
           <div className="text-center mb-12">
             <span className="text-emerald-600 font-bold text-xs uppercase tracking-widest bg-emerald-50 px-3 py-1 rounded-full border border-emerald-200">
@@ -286,77 +348,78 @@ export default function Home() {
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {filteredRides.length > 0 ? (
-              filteredRides.map((ride) => (
-                <div
-                  key={ride.id}
-                  className="bg-white border border-slate-200/80 rounded-2xl p-6 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 flex flex-col justify-between group"
-                >
-                  <div>
-                    {/* Header: Vehicle Tag & Rating */}
-                    <div className="flex justify-between items-center mb-5">
-                      <span className="bg-emerald-50 text-emerald-700 text-xs px-3 py-1 rounded-lg font-bold border border-emerald-200/60 flex items-center gap-1.5">
-                        <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                        {ride.vehicle}
-                      </span>
-                      <span className="text-xs font-bold text-slate-600 bg-slate-100 px-2.5 py-1 rounded-lg flex items-center gap-1">
-                        ⭐ {ride.rating}
-                      </span>
-                    </div>
-
-                    {/* Route Info */}
-                    <div className="mb-6">
-                      <div className="flex items-center gap-2 text-xs text-slate-400 font-medium mb-1">
-                        <span>📅 {ride.date}</span>
-                      </div>
-                      <h4 className="text-2xl font-black text-slate-900 tracking-tight group-hover:text-emerald-600 transition-colors">
-                        {ride.from} <span className="text-emerald-500 font-normal">➔</span> {ride.to}
-                      </h4>
-                      <p className="text-xs text-slate-500 mt-1 font-medium flex items-center gap-1">
-                        <span>👤 Host:</span> <strong className="text-slate-700">{ride.driver}</strong>
-                      </p>
-                    </div>
-
-                    {/* Detail Card Inside */}
-                    <div className="bg-slate-50 rounded-xl p-3.5 border border-slate-100 flex justify-between items-center text-sm mb-6">
-                      <div>
-                        <span className="text-slate-400 block text-xs font-medium">Seats Left</span>
-                        <span className="font-extrabold text-emerald-600 text-sm">{ride.seatsLeft} Seats</span>
-                      </div>
-                      <div className="h-8 w-px bg-slate-200"></div>
-                      <div className="text-right">
-                        <span className="text-slate-400 block text-xs font-medium">Price / Seat</span>
-                        <span className="font-black text-slate-900 text-base">Rs. {ride.pricePerSeat.toLocaleString()}</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <button
-                    onClick={() => alert(`Booking request sent to ${ride.driver}!`)}
-                    className="w-full bg-slate-900 hover:bg-emerald-600 text-white font-bold py-3.5 rounded-xl transition-all duration-300 text-sm shadow-md shadow-slate-900/10 group-hover:shadow-emerald-600/20"
+          {loadingRides ? (
+            <div className="flex justify-center items-center py-16">
+              <div className="w-8 h-8 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin"></div>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+              {filteredRides.length > 0 ? (
+                filteredRides.map((ride) => (
+                  <div
+                    key={ride._id}
+                    className="bg-white border border-slate-200/80 rounded-2xl p-6 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 flex flex-col justify-between group"
                   >
-                    Request to Join
-                  </button>
+                    <div>
+                      <div className="flex justify-between items-center mb-5">
+                        <span className="bg-emerald-50 text-emerald-700 text-xs px-3 py-1 rounded-lg font-bold border border-emerald-200/60 flex items-center gap-1.5">
+                          <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                          {ride.vehicle}
+                        </span>
+                        <span className="text-xs font-bold text-slate-600 bg-slate-100 px-2.5 py-1 rounded-lg flex items-center gap-1">
+                          ⭐ {ride.rating || "4.8"}
+                        </span>
+                      </div>
+
+                      <div className="mb-6">
+                        <div className="flex items-center gap-2 text-xs text-slate-400 font-medium mb-1">
+                          <span>📅 {ride.date}</span>
+                        </div>
+                        <h4 className="text-2xl font-black text-slate-900 tracking-tight group-hover:text-emerald-600 transition-colors">
+                          {ride.from} <span className="text-emerald-500 font-normal">➔</span> {ride.to}
+                        </h4>
+                        <p className="text-xs text-slate-500 mt-1 font-medium flex items-center gap-1">
+                          <span>👤 Host:</span> <strong className="text-slate-700">{ride.driver}</strong>
+                        </p>
+                      </div>
+
+                      <div className="bg-slate-50 rounded-xl p-3.5 border border-slate-100 flex justify-between items-center text-sm mb-6">
+                        <div>
+                          <span className="text-slate-400 block text-xs font-medium">Seats Left</span>
+                          <span className="font-extrabold text-emerald-600 text-sm">{ride.seatsLeft} Seats</span>
+                        </div>
+                        <div className="h-8 w-px bg-slate-200"></div>
+                        <div className="text-right">
+                          <span className="text-slate-400 block text-xs font-medium">Price / Seat</span>
+                          <span className="font-black text-slate-900 text-base">Rs. {Number(ride.pricePerSeat).toLocaleString()}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <button
+                      onClick={() => alert(`Booking request sent to ${ride.driver}!`)}
+                      className="w-full bg-slate-900 hover:bg-emerald-600 text-white font-bold py-3.5 rounded-xl transition-all duration-300 text-sm shadow-md shadow-slate-900/10 group-hover:shadow-emerald-600/20"
+                    >
+                      Request to Join
+                    </button>
+                  </div>
+                ))
+              ) : (
+                <div className="col-span-full text-center py-16 text-slate-400 bg-white rounded-2xl border border-slate-200/80 shadow-sm">
+                  No rides found matching your search parameters.
                 </div>
-              ))
-            ) : (
-              <div className="col-span-full text-center py-16 text-slate-400 bg-white rounded-2xl border border-slate-200/80 shadow-sm">
-                No rides found matching your search parameters.
-              </div>
-            )}
-          </div>
+              )}
+            </div>
+          )}
         </section>
 
-        {/* Quick Expense Calculator */}
+        {/* Expense Calculator */}
         <section id="calculator" className="mt-32 px-4 max-w-6xl mx-auto">
           <div className="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white rounded-3xl p-8 md:p-12 shadow-2xl border border-slate-700/50 relative overflow-hidden">
-            {/* Background Accent Lines */}
             <div className="absolute top-0 right-0 w-96 h-96 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
             <div className="absolute bottom-0 left-0 w-96 h-96 bg-teal-500/10 rounded-full blur-3xl pointer-events-none" />
 
             <div className="relative z-10 grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
-              {/* Left Info */}
               <div className="lg:col-span-5 space-y-4">
                 <span className="text-emerald-400 text-xs font-bold uppercase tracking-widest bg-emerald-500/10 px-3 py-1 rounded-full border border-emerald-500/20">
                   Instant Estimator
@@ -369,7 +432,6 @@ export default function Home() {
                 </p>
               </div>
 
-              {/* Right Calculator Card */}
               <div className="lg:col-span-7 bg-white/10 backdrop-blur-md p-6 md:p-8 rounded-2xl border border-white/10 space-y-5">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
@@ -417,7 +479,7 @@ export default function Home() {
           </div>
         </section>
 
-        {/* Latest Travel News Section */}
+        {/* News Section */}
         <section id="blogs" className="mt-32 mb-32 px-4 max-w-6xl mx-auto">
           <div className="text-center mb-12">
             <span className="text-emerald-600 font-bold text-xs uppercase tracking-widest bg-emerald-50 px-3 py-1 rounded-full border border-emerald-200">
@@ -474,7 +536,6 @@ export default function Home() {
       <footer className="bg-slate-900 text-slate-300 pt-16 pb-8 border-t border-slate-800 mt-auto">
         <div className="max-w-6xl mx-auto px-6">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-10 pb-12 border-b border-slate-800">
-            {/* Col 1: About */}
             <div className="space-y-4">
               <h2 className="text-2xl font-black text-white tracking-wider">
                 Way<span className="text-emerald-400">Mate</span>
@@ -484,34 +545,16 @@ export default function Home() {
               </p>
             </div>
 
-            {/* Col 2: Quick Links */}
             <div>
               <h4 className="text-white font-bold mb-4 text-base">Quick Links</h4>
               <ul className="space-y-2.5 text-sm">
-                <li>
-                  <a href="#features" className="hover:text-emerald-400 transition-colors">
-                    Features
-                  </a>
-                </li>
-                <li>
-                  <a href="#routes" className="hover:text-emerald-400 transition-colors">
-                    Find Rides
-                  </a>
-                </li>
-                <li>
-                  <a href="#calculator" className="hover:text-emerald-400 transition-colors">
-                    Cost Splitter
-                  </a>
-                </li>
-                <li>
-                  <a href="#blogs" className="hover:text-emerald-400 transition-colors">
-                    Travel News
-                  </a>
-                </li>
+                <li><a href="#features" className="hover:text-emerald-400 transition-colors">Features</a></li>
+                <li><a href="#routes" className="hover:text-emerald-400 transition-colors">Find Rides</a></li>
+                <li><a href="#calculator" className="hover:text-emerald-400 transition-colors">Cost Splitter</a></li>
+                <li><a href="#blogs" className="hover:text-emerald-400 transition-colors">Travel News</a></li>
               </ul>
             </div>
 
-            {/* Col 3: Popular Routes */}
             <div>
               <h4 className="text-white font-bold mb-4 text-base">Popular Routes</h4>
               <ul className="space-y-2.5 text-sm text-slate-400">
@@ -522,12 +565,9 @@ export default function Home() {
               </ul>
             </div>
 
-            {/* Col 4: Newsletter */}
             <div>
               <h4 className="text-white font-bold mb-4 text-base">Newsletter</h4>
-              <p className="text-xs text-slate-400 mb-3">
-                Subscribe for route updates and travel offers.
-              </p>
+              <p className="text-xs text-slate-400 mb-3">Subscribe for route updates and travel offers.</p>
               <div className="flex flex-col gap-2">
                 <input
                   type="email"
@@ -541,25 +581,18 @@ export default function Home() {
             </div>
           </div>
 
-          {/* Bottom Bar */}
           <div className="pt-8 flex flex-col md:flex-row items-center justify-between text-xs text-slate-500 gap-4">
             <p>© 2026 WayMate Inc. All rights reserved.</p>
             <div className="flex space-x-6">
-              <a href="#" className="hover:text-slate-400 transition-colors">
-                Privacy Policy
-              </a>
-              <a href="#" className="hover:text-slate-400 transition-colors">
-                Terms of Service
-              </a>
-              <a href="#" className="hover:text-slate-400 transition-colors">
-                Contact Us
-              </a>
+              <a href="#" className="hover:text-slate-400 transition-colors">Privacy Policy</a>
+              <a href="#" className="hover:text-slate-400 transition-colors">Terms of Service</a>
+              <a href="#" className="hover:text-slate-400 transition-colors">Contact Us</a>
             </div>
           </div>
         </div>
       </footer>
 
-      {/* Auth Modal */}
+      {/* Auth Modal (Sign In / Register UI) */}
       {isAuthOpen && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
           <div className="bg-white border border-slate-200 w-full max-w-md p-6 rounded-2xl shadow-2xl relative">
@@ -574,7 +607,7 @@ export default function Home() {
               {authMode === "signin" ? "Welcome Back" : "Create Account"}
             </h3>
 
-            <form onSubmit={(e) => e.preventDefault()} className="space-y-4">
+            <form onSubmit={handleAuthSubmit} className="space-y-4">
               {authMode === "signup" && (
                 <div>
                   <label className="block text-sm font-semibold text-slate-700 mb-1">
@@ -582,6 +615,9 @@ export default function Home() {
                   </label>
                   <input
                     type="text"
+                    required
+                    value={fullName}
+                    onChange={(e) => setFullName(e.target.value)}
                     placeholder="John Doe"
                     className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500"
                   />
@@ -594,6 +630,9 @@ export default function Home() {
                 </label>
                 <input
                   type="email"
+                  required
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
                   placeholder="name@example.com"
                   className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500"
                 />
@@ -603,18 +642,35 @@ export default function Home() {
                 <label className="block text-sm font-semibold text-slate-700 mb-1">
                   Password
                 </label>
-                <input
-                  type="password"
-                  placeholder="••••••••"
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                />
+                <div className="relative">
+                  <input
+                    type={showPassword ? "text" : "password"}
+                    required
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="••••••••"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-2.5 text-xs text-slate-500 font-semibold"
+                  >
+                    {showPassword ? "Hide" : "Show"}
+                  </button>
+                </div>
               </div>
 
               <button
                 type="submit"
-                className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 rounded-xl transition-colors mt-2 shadow-md shadow-emerald-600/10"
+                disabled={authLoading}
+                className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 rounded-xl transition-all shadow-md shadow-emerald-600/20 text-sm mt-2 disabled:opacity-50"
               >
-                {authMode === "signin" ? "Sign In" : "Register"}
+                {authLoading
+                  ? "Processing..."
+                  : authMode === "signin"
+                  ? "Sign In"
+                  : "Register"}
               </button>
             </form>
 
@@ -624,7 +680,7 @@ export default function Home() {
                   Don't have an account?{" "}
                   <button
                     onClick={() => setAuthMode("signup")}
-                    className="text-emerald-600 hover:underline font-bold"
+                    className="text-emerald-600 font-bold hover:underline"
                   >
                     Register
                   </button>
@@ -634,7 +690,7 @@ export default function Home() {
                   Already have an account?{" "}
                   <button
                     onClick={() => setAuthMode("signin")}
-                    className="text-emerald-600 hover:underline font-bold"
+                    className="text-emerald-600 font-bold hover:underline"
                   >
                     Sign In
                   </button>
