@@ -1,36 +1,62 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# 🌴 WayMate - Sri Lanka Travel Companion
 
-## Getting Started
+**WayMate** is a modern full-stack web application designed to enhance the travel experience in Sri Lanka. It helps tourists and travelers discover top attractions, hire verified private vehicles and local drivers, book curated group tour packages, and plan custom travel itineraries using AI.
 
-First, run the development server:
+---
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+## 🚀 Features
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+- 🏛️ **Top Attractions:** Explore iconic travel destinations, historical landmarks, best visiting times, and entry fees.
+- 🚗 **Private Vehicles & Drivers:** Browse verified drivers and vehicles (cars, vans, buses) with transparent daily rates.
+- 🎒 **Group Tour Packages:** Book curated group tours managed by local tour operators.
+- 🤖 **AI Trip Planner:** Generate personalized multi-day Sri Lanka itineraries based on preferences and budget.
+- 🔐 **User Authentication & Profiles:** Secure registration, login, and user dynamic management.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+---
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## 🛠️ Tech Stack
 
-## Learn More
+### **Frontend**
+- **Framework:** Next.js (App Router)
+- **Library:** React
+- **Language:** TypeScript
+- **Styling:** Tailwind CSS
 
-To learn more about Next.js, take a look at the following resources:
+### **Backend**
+- **Runtime Environment:** Node.js
+- **Framework:** Express.js
+- **Language:** JavaScript (ES6+)
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+### **Database & Authentication**
+- **Database:** MongoDB
+- **ODM:** Mongoose
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+### **Tools & Version Control**
+- VS Code, Postman, Git, GitHub, npm
 
-## Deploy on Vercel
+---
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## 📂 Project Structure
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+```text
+WayMate/
+├── app/                  # Next.js App Router (Frontend)
+│   ├── layout.tsx        # Global Layout & Metadata
+│   ├── page.tsx          # Home Page
+│   ├── user/             # Top Attractions / User Dashboard Page
+│   ├── vehicles/         # Private Vehicles & Drivers Page
+│   ├── tours/            # Group Tour Packages Page
+│   └── ai-planner/       # AI Trip Planner Page
+│
+├── components/           # Reusable React UI Components
+│   └── Navbar.tsx        # Responsive Navigation Bar
+│
+├── backend/              # Node.js + Express Backend API
+│   ├── config/           # Database configuration (db.js)
+│   ├── models/           # Mongoose schemas/models
+│   ├── routes/           # Express API endpoints
+│   ├── .env              # Environment variables
+│   └── server.js         # Backend entry point
+│
+├── public/               # Static assets & icons
+└── package.json          # Project dependencies & scripts
