@@ -1,80 +1,72 @@
-"use client";
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
-
-export default function AdminDashboard() {
-  const router = useRouter();
-
-  useEffect(() => {
-    const role = localStorage.getItem("userRole");
-    const email = localStorage.getItem("userEmail");
-
-    // Secure Check for Admin Route
-    if (role !== "admin" && email !== "admin@gmail.com") {
-      router.push("/");
-    }
-  }, [router]);
-
-  const handleLogout = () => {
-    localStorage.clear();
-    router.push("/");
-  };
+export default function AdminDashboardPage() {
+  const stats = [
+    { title: 'Total Attractions', count: '48', icon: '🏞️', color: 'bg-blue-500' },
+    { title: 'Registered Drivers', count: '24', icon: '🚘', color: 'bg-emerald-500' },
+    { title: 'Active Tour Packages', count: '12', icon: '🌴', color: 'bg-amber-500' },
+    { title: 'Total Bookings', count: '156', icon: '📑', color: 'bg-purple-500' },
+  ];
 
   return (
-    <div className="min-h-screen bg-slate-900 text-white flex flex-col font-sans">
-      {/* Admin Header */}
-      <header className="bg-slate-800 border-b border-slate-700 px-8 py-4 flex justify-between items-center">
-        <h1 className="text-2xl font-black text-emerald-400 flex items-center gap-2">
-          Way<span className="text-white">Mate</span> <span className="text-xs bg-red-500/20 text-red-400 border border-red-500/30 px-2 py-0.5 rounded-md uppercase font-bold">Admin Panel</span>
-        </h1>
-        <button
-          onClick={handleLogout}
-          className="bg-red-600 hover:bg-red-700 text-white text-xs font-bold px-4 py-2 rounded-xl transition-all"
-        >
-          Logout Admin
-        </button>
-      </header>
+    <div className="space-y-6">
+      {/* Title */}
+      <div>
+        <h2 className="text-2xl font-bold text-slate-800">Dashboard Overview</h2>
+        <p className="text-sm text-slate-500">Welcome back! Here is what's happening today.</p>
+      </div>
 
-      {/* Admin Content */}
-      <main className="p-8 max-w-7xl mx-auto w-full flex-1">
-        <h2 className="text-3xl font-extrabold mb-6">System Management Overview</h2>
+      {/* Stats Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        {stats.map((stat, idx) => (
+          <div key={idx} className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
+            <div>
+              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">{stat.title}</p>
+              <h3 className="text-2xl font-black text-slate-800 mt-1">{stat.count}</h3>
+            </div>
+            <div className={`w-12 h-12 rounded-2xl ${stat.color} text-white text-xl flex items-center justify-center shadow-md`}>
+              {stat.icon}
+            </div>
+          </div>
+        ))}
+      </div>
 
-        {/* Stats Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-10">
-          <div className="bg-slate-800/80 p-6 rounded-2xl border border-slate-700">
-            <p className="text-xs text-slate-400 font-bold uppercase">Total Users</p>
-            <h3 className="text-3xl font-black text-emerald-400 mt-2">1,248</h3>
-          </div>
-          <div className="bg-slate-800/80 p-6 rounded-2xl border border-slate-700">
-            <p className="text-xs text-slate-400 font-bold uppercase">Active Rides</p>
-            <h3 className="text-3xl font-black text-teal-400 mt-2">84</h3>
-          </div>
-          <div className="bg-slate-800/80 p-6 rounded-2xl border border-slate-700">
-            <p className="text-xs text-slate-400 font-bold uppercase">Pending Approvals</p>
-            <h3 className="text-3xl font-black text-amber-400 mt-2">12</h3>
-          </div>
-          <div className="bg-slate-800/80 p-6 rounded-2xl border border-slate-700">
-            <p className="text-xs text-slate-400 font-bold uppercase">Total Bookings</p>
-            <h3 className="text-3xl font-black text-indigo-400 mt-2">3,590</h3>
-          </div>
+      {/* Recent Activity Table Preview */}
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
+        <h3 className="text-lg font-bold text-slate-800 mb-4">Recent Bookings</h3>
+        <div className="overflow-x-auto">
+          <table className="w-full text-left border-collapse">
+            <thead>
+              <tr className="border-b border-slate-200 text-slate-400 text-xs uppercase font-semibold">
+                <th className="pb-3">User</th>
+                <th className="pb-3">Service</th>
+                <th className="pb-3">Date</th>
+                <th className="pb-3">Status</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100 text-sm font-medium text-slate-700">
+              <tr>
+                <td className="py-3">John Doe</td>
+                <td className="py-3">Private Driver (Colombo - Kandy)</td>
+                <td className="py-3">Oct 12, 2026</td>
+                <td className="py-3">
+                  <span className="bg-emerald-100 text-emerald-700 text-xs font-bold px-2.5 py-1 rounded-full">
+                    Confirmed
+                  </span>
+                </td>
+              </tr>
+              <tr>
+                <td className="py-3">Sarah Smith</td>
+                <td className="py-3">Cultural Triangle Tour Package</td>
+                <td className="py-3">Oct 15, 2026</td>
+                <td className="py-3">
+                  <span className="bg-amber-100 text-amber-700 text-xs font-bold px-2.5 py-1 rounded-full">
+                    Pending
+                  </span>
+                </td>
+              </tr>
+            </tbody>
+          </table>
         </div>
-
-        {/* Admin Management Section */}
-        <div className="bg-slate-800 rounded-2xl p-6 border border-slate-700">
-          <h3 className="text-xl font-bold mb-4">Quick Admin Controls</h3>
-          <div className="flex gap-4">
-            <button className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs px-5 py-3 rounded-xl transition-all">
-              Manage Users
-            </button>
-            <button className="bg-slate-700 hover:bg-slate-600 text-white font-bold text-xs px-5 py-3 rounded-xl transition-all">
-              Review Ride Postings
-            </button>
-            <button className="bg-slate-700 hover:bg-slate-600 text-white font-bold text-xs px-5 py-3 rounded-xl transition-all">
-              System Logs
-            </button>
-          </div>
-        </div>
-      </main>
+      </div>
     </div>
   );
 }
