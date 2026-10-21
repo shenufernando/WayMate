@@ -35,19 +35,27 @@ export default function Home() {
   const [password, setPassword] = useState("");
   const [fullName, setFullName] = useState("");
   const [authLoading, setAuthLoading] = useState(false);
+  const [authMessage, setAuthMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
   const [fromSearch, setFromSearch] = useState("");
   const [toSearch, setToSearch] = useState("");
   const [travelDate, setTravelDate] = useState("");
 
-  // Rides backend එකෙන් ලබා ගැනීම සඳහා State එක
   const [rides, setRides] = useState<Ride[]>([]);
   const [loadingRides, setLoadingRides] = useState<boolean>(true);
 
   const [blogs, setBlogs] = useState<BlogPost[]>([]);
   const [loadingBlogs, setLoadingBlogs] = useState<boolean>(true);
 
-  // Backend API එකෙන් Rides දත්ත ලබා ගැනීම (Fetch)
+  const openAuthModal = (mode: "signin" | "signup") => {
+    setAuthMode(mode);
+    setEmail("");
+    setPassword("");
+    setFullName("");
+    setAuthMessage(null);
+    setIsAuthOpen(true);
+  };
+
   useEffect(() => {
     fetch("http://localhost:5000/api/rides")
       .then((res) => res.json())
@@ -63,7 +71,6 @@ export default function Home() {
       });
   }, []);
 
-  // News/Blogs Fetch කිරීම
   useEffect(() => {
     fetch("https://techcrunch.com/wp-json/wp/v2/posts?per_page=3")
       .then((res) => res.json())
@@ -88,16 +95,21 @@ export default function Home() {
     return matchesFrom && matchesTo && matchesDate;
   });
 
-  // Auth Submit Handle කිරීම සහ Dashboard Redirect Logic එක
   const handleAuthSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setAuthLoading(true);
+    setAuthMessage(null);
 
-    // Hardcoded Admin Check (Optional Quick Check)
-    if (authMode === "signin" && email === "admin@gmail.com" && password === "admin123") {
+    // Hardcoded Admin Check
+    if (authMode === "signin" && email.trim().toLowerCase() === "admin@gmail.com" && password === "admin123") {
+      setAuthMessage({ type: "success", text: "Admin Sign-in Successful! Redirecting..." });
       localStorage.setItem("userRole", "admin");
       localStorage.setItem("userEmail", email);
-      router.push("/admin");
+      
+      setTimeout(() => {
+        setIsAuthOpen(false);
+        router.push("/admin");
+      }, 1500);
       setAuthLoading(false);
       return;
     }
@@ -110,8 +122,8 @@ export default function Home() {
 
       const payload =
         authMode === "signup"
-          ? { name: fullName, email, password }
-          : { email, password };
+          ? { name: fullName, email: email.trim(), password }
+          : { email: email.trim(), password };
 
       const res = await fetch(endpoint, {
         method: "POST",
@@ -122,29 +134,38 @@ export default function Home() {
       const data = await res.json();
 
       if (res.ok) {
-        if (data.token) localStorage.setItem("token", data.token);
-        localStorage.setItem("userRole", data.user?.role || "user");
-        localStorage.setItem("userName", data.user?.name || fullName);
-        localStorage.setItem("userEmail", data.user?.email || email);
-
-        setIsAuthOpen(false);
-
-        if (data.user?.role === "admin" || email === "admin@gmail.com") {
-          router.push("/admin");
+        if (authMode === "signup") {
+          // Register una gaman sign in page ekata maru wela success message eka pennai
+          setAuthMessage({ type: "success", text: "Registration Successful! Please Sign In." });
+          setPassword("");
+          setTimeout(() => {
+            setAuthMode("signin");
+            setAuthMessage({ type: "success", text: "Please sign in with your registered credentials." });
+          }, 1500);
         } else {
-          router.push("/user");
+          // Sign in una gaman success kiyala dashboard ekata yai[cite: 5, 6]
+          setAuthMessage({ type: "success", text: "Sign-in Successful! Redirecting..." });
+
+          if (data.token) localStorage.setItem("token", data.token);
+          localStorage.setItem("userRole", data.user?.role || "user");
+          localStorage.setItem("userName", data.user?.name || fullName);
+          localStorage.setItem("userEmail", data.user?.email || email);
+
+          setTimeout(() => {
+            setIsAuthOpen(false);
+            if (data.user?.role === "admin" || email.trim().toLowerCase() === "admin@gmail.com") {
+              router.push("/admin");
+            } else {
+              router.push("/user");
+            }
+          }, 1500);
         }
       } else {
-        alert(data.message || "Authentication failed!");
+        setAuthMessage({ type: "error", text: data.message || "Authentication failed! Please check your details." });
       }
     } catch (error) {
       console.error("Auth Error:", error);
-      // Backend එක නැති විට Demo Mode redirection
-      if (email === "admin@gmail.com") {
-        router.push("/admin");
-      } else {
-        router.push("/user");
-      }
+      setAuthMessage({ type: "error", text: "Connection error or invalid credentials!" });
     } finally {
       setAuthLoading(false);
     }
@@ -176,10 +197,7 @@ export default function Home() {
 
           <div className="flex justify-end w-1/4">
             <button
-              onClick={() => {
-                setAuthMode("signin");
-                setIsAuthOpen(true);
-              }}
+              onClick={() => openAuthModal("signin")}
               className="bg-emerald-600 hover:bg-slate-900 active:bg-slate-900 text-white px-5 py-2.5 rounded-xl font-bold transition-all duration-300 shadow-sm hover:shadow-slate-900/20 text-xs tracking-wide"
             >
               Sign In
@@ -607,7 +625,21 @@ export default function Home() {
               {authMode === "signin" ? "Welcome Back" : "Create Account"}
             </h3>
 
-            <form onSubmit={handleAuthSubmit} className="space-y-4">
+            {authMessage && (
+              <div className={`mb-4 p-3 rounded-xl text-xs font-semibold text-center border ${
+                authMessage.type === "success" 
+                  ? "bg-emerald-50 border-emerald-200 text-emerald-600" 
+                  : "bg-rose-50 border-rose-200 text-rose-600"
+              }`}>
+                {authMessage.type === "success" ? "✅ " : "⚠️ "}
+                {authMessage.text}
+              </div>
+            )}
+
+            <form onSubmit={handleAuthSubmit} className="space-y-4" autoComplete="off">
+              <input type="text" name="fake_email_prevent" style={{ display: "none" }} tabIndex={-1} />
+              <input type="password" name="fake_pass_prevent" style={{ display: "none" }} tabIndex={-1} />
+
               {authMode === "signup" && (
                 <div>
                   <label className="block text-sm font-semibold text-slate-700 mb-1">
@@ -616,6 +648,7 @@ export default function Home() {
                   <input
                     type="text"
                     required
+                    autoComplete="off"
                     value={fullName}
                     onChange={(e) => setFullName(e.target.value)}
                     placeholder="John Doe"
@@ -631,9 +664,10 @@ export default function Home() {
                 <input
                   type="email"
                   required
+                  autoComplete="off"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="name@example.com"
+                  placeholder="email@example.com"
                   className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500"
                 />
               </div>
@@ -646,15 +680,16 @@ export default function Home() {
                   <input
                     type={showPassword ? "text" : "password"}
                     required
+                    autoComplete="new-password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="••••••••"
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500 pr-16"
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-2.5 text-xs text-slate-500 font-semibold"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-600 hover:text-emerald-600 bg-slate-200/60 px-2 py-1 rounded-md"
                   >
                     {showPassword ? "Hide" : "Show"}
                   </button>
@@ -664,35 +699,31 @@ export default function Home() {
               <button
                 type="submit"
                 disabled={authLoading}
-                className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 rounded-xl transition-all shadow-md shadow-emerald-600/20 text-sm mt-2 disabled:opacity-50"
+                className="w-full bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-400 text-white font-bold py-3 rounded-xl transition-all shadow-md text-sm"
               >
-                {authLoading
-                  ? "Processing..."
-                  : authMode === "signin"
-                  ? "Sign In"
-                  : "Register"}
+                {authLoading ? "Processing..." : authMode === "signin" ? "Sign In" : "Register"}
               </button>
             </form>
 
-            <div className="mt-6 text-center text-sm text-slate-500">
+            <div className="mt-6 text-center text-xs text-slate-500">
               {authMode === "signin" ? (
                 <p>
                   Don't have an account?{" "}
                   <button
-                    onClick={() => setAuthMode("signup")}
-                    className="text-emerald-600 font-bold hover:underline"
+                    onClick={() => openAuthModal("signup")}
+                    className="text-emerald-600 font-bold hover:underline cursor-pointer bg-transparent border-none"
                   >
-                    Register
+                    Register Here
                   </button>
                 </p>
               ) : (
                 <p>
                   Already have an account?{" "}
                   <button
-                    onClick={() => setAuthMode("signin")}
-                    className="text-emerald-600 font-bold hover:underline"
+                    onClick={() => openAuthModal("signin")}
+                    className="text-emerald-600 font-bold hover:underline cursor-pointer bg-transparent border-none"
                   >
-                    Sign In
+                    Sign In Here
                   </button>
                 </p>
               )}
