@@ -16,6 +16,7 @@ export default function ManageAttractionsPage() {
   const [attractions, setAttractions] = useState<Attraction[]>([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
 
   // Form State
   const [formData, setFormData] = useState({
@@ -64,7 +65,7 @@ export default function ManageAttractionsPage() {
     }
   };
 
-  // Submit New Attraction
+  // Submit (Add or Update) Attraction
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -77,14 +78,23 @@ export default function ManageAttractionsPage() {
     setMessage(null);
 
     try {
-      const res = await fetch("http://localhost:5000/api/attractions", {
-        method: "POST",
+      const url = editingId 
+        ? `http://localhost:5000/api/attractions/${editingId}`
+        : "http://localhost:5000/api/attractions";
+      
+      const method = editingId ? "PUT" : "POST";
+
+      const res = await fetch(url, {
+        method: method,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(formData),
       });
 
       if (res.ok) {
-        setMessage({ type: "success", text: "Attraction added successfully!" });
+        setMessage({ 
+          type: "success", 
+          text: editingId ? "Attraction updated successfully!" : "Attraction added successfully!" 
+        });
         setFormData({
           title: "",
           location: "",
@@ -94,15 +104,31 @@ export default function ManageAttractionsPage() {
           bestTime: "",
           entryFee: "",
         });
+        setEditingId(null);
         fetchAttractions();
       } else {
-        setMessage({ type: "error", text: "Failed to add attraction." });
+        setMessage({ type: "error", text: "Failed to save attraction." });
       }
     } catch (err) {
       setMessage({ type: "error", text: "Server connection failed!" });
     } finally {
       setSubmitting(false);
     }
+  };
+
+  // Handle Edit Click (Data එක Form එකට Load කිරීම)
+  const handleEdit = (place: Attraction) => {
+    setEditingId(place._id);
+    setFormData({
+      title: place.title,
+      location: place.location,
+      image: place.image,
+      shortDescription: place.shortDescription,
+      fullDescription: place.fullDescription,
+      bestTime: place.bestTime,
+      entryFee: place.entryFee,
+    });
+    window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
   // Delete Attraction
@@ -131,9 +157,11 @@ export default function ManageAttractionsPage() {
         <p className="text-sm text-slate-500">Add, edit, and monitor destinations for users.</p>
       </div>
 
-      {/* Add Attraction Form */}
+      {/* Add / Edit Attraction Form */}
       <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
-        <h3 className="text-lg font-bold text-slate-800 mb-4">Add New Attraction</h3>
+        <h3 className="text-lg font-bold text-slate-800 mb-4">
+          {editingId ? "Edit Attraction" : "Add New Attraction"}
+        </h3>
 
         {message && (
           <div className={`mb-4 p-3 rounded-xl text-xs font-semibold ${
@@ -176,7 +204,6 @@ export default function ManageAttractionsPage() {
             <input
               type="file"
               accept="image/*"
-              required
               onChange={handleImageUpload}
               className="w-full px-3 py-2 text-xs text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-emerald-600 file:text-white hover:file:bg-emerald-700 border border-slate-200 rounded-xl cursor-pointer bg-white"
             />
@@ -184,7 +211,7 @@ export default function ManageAttractionsPage() {
             {formData.image && (
               <div className="mt-3 flex items-center gap-3">
                 <img src={formData.image} alt="Preview" className="w-20 h-20 object-cover rounded-xl border border-slate-300 shadow-sm" />
-                <span className="text-xs text-emerald-600 font-bold">✅ Image Selected & Ready to Upload!</span>
+                <span className="text-xs text-emerald-600 font-bold">✅ Image Selected & Ready!</span>
               </div>
             )}
           </div>
@@ -239,14 +266,35 @@ export default function ManageAttractionsPage() {
             />
           </div>
 
-          <div className="md:col-span-2">
+          <div className="md:col-span-2 flex gap-3">
             <button
               type="submit"
               disabled={submitting}
               className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-6 py-3 rounded-xl text-sm transition-all shadow-md disabled:bg-slate-400 cursor-pointer"
             >
-              {submitting ? "Uploading..." : "Add Attraction"}
+              {submitting ? "Saving..." : editingId ? "Update Attraction" : "Add Attraction"}
             </button>
+
+            {editingId && (
+              <button
+                type="button"
+                onClick={() => {
+                  setEditingId(null);
+                  setFormData({
+                    title: "",
+                    location: "",
+                    image: "",
+                    shortDescription: "",
+                    fullDescription: "",
+                    bestTime: "",
+                    entryFee: "",
+                  });
+                }}
+                className="bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold px-6 py-3 rounded-xl text-sm transition-all cursor-pointer"
+              >
+                Cancel
+              </button>
+            )}
           </div>
         </form>
       </div>
@@ -278,7 +326,13 @@ export default function ManageAttractionsPage() {
                     <td className="py-3 font-bold text-slate-800">{place.title}</td>
                     <td className="py-3">{place.location}</td>
                     <td className="py-3 text-emerald-600 font-bold">{place.entryFee || "Free"}</td>
-                    <td className="py-3 text-right">
+                    <td className="py-3 text-right space-x-2">
+                      <button
+                        onClick={() => handleEdit(place)}
+                        className="bg-sky-50 hover:bg-sky-100 text-sky-600 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors cursor-pointer"
+                      >
+                        Edit
+                      </button>
                       <button
                         onClick={() => handleDelete(place._id)}
                         className="bg-rose-50 hover:bg-rose-100 text-rose-600 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors cursor-pointer"

@@ -23,6 +23,25 @@ router.post('/', async (req, res) => {
   }
 });
 
+// Update an attraction by ID (Admin Feature - EDIT)
+router.put('/:id', async (req, res) => {
+  try {
+    const updatedAttraction = await Attraction.findByIdAndUpdate(
+      req.params.id,
+      req.body,
+      { new: true, runValidators: true }
+    );
+
+    if (!updatedAttraction) {
+      return res.status(404).json({ message: 'Attraction not found' });
+    }
+
+    res.json(updatedAttraction);
+  } catch (err) {
+    res.status(400).json({ message: 'Error updating attraction' });
+  }
+});
+
 // Delete an attraction (Admin Feature)
 router.delete('/:id', async (req, res) => {
   try {
