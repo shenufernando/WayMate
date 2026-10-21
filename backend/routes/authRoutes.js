@@ -8,5 +8,5 @@ router.post('/register', registerUser);
 // Login Route
 router.post('/login', loginUser);
 
-// 🔴 මෙම පේළිය අනිවාර්යයෙන්ම තිබිය යුතුය (මෙහි වැරැද්දක් තිබුණොත් Nodemon App Crash වේ)
+// 🔴 This line must be present (if there is an error here, Nodemon will cause the app to crash)
 module.exports = router;
