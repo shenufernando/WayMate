@@ -1,6 +1,5 @@
 "use client";
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
 
 interface Attraction {
   _id: string;
@@ -14,7 +13,6 @@ interface Attraction {
 }
 
 export default function UserDashboard() {
-  const router = useRouter();
   const [attractions, setAttractions] = useState<Attraction[]>([]);
   const [selectedAttraction, setSelectedAttraction] = useState<Attraction | null>(null);
   const [loading, setLoading] = useState(true);
@@ -33,67 +31,26 @@ export default function UserDashboard() {
       });
   }, []);
 
-  // Logout handler function
-  const handleLogout = () => {
-    localStorage.removeItem("userToken");
-    localStorage.removeItem("currentUser");
-    localStorage.removeItem("token");
-    localStorage.removeItem("userRole");
-    
-    // Redirect directly to Home Page
-    router.push("/");
-  };
-
   return (
     <div className="min-h-screen bg-slate-50 font-sans flex flex-col justify-between">
       <div>
-        {/* Navigation Bar */}
-        <nav className="flex justify-between items-center px-8 py-4 bg-white/80 backdrop-blur-lg sticky top-0 z-40 border-b border-slate-200/60 shadow-sm">
-          <h1 className="text-2xl font-black tracking-tight text-emerald-600 w-1/4 flex items-center gap-1">
-            Way<span className="text-teal-500">Mate</span>
-          </h1>
-
-          <div className="flex items-center justify-center space-x-8 text-sm font-semibold text-slate-600 w-2/4">
-            <a href="#attractions" className="text-emerald-600 border-b-2 border-emerald-600 pb-1">
-              Top Attractions
-            </a>
-            <a href="#vehicles" className="hover:text-emerald-600 transition-colors">
-              Private Vehicles & Drivers
-            </a>
-            <a href="#tours" className="hover:text-emerald-600 transition-colors">
-              Group Tour Packages
-            </a>
-            <a href="#planner" className="hover:text-emerald-600 transition-colors">
-              AI Trip Planner
-            </a>
-          </div>
-
-          {/* Logout Button */}
-          <div className="flex justify-end w-1/4">
-            <button
-              onClick={handleLogout}
-              className="bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white px-5 py-2.5 rounded-xl font-bold transition-all duration-300 shadow-sm text-xs tracking-wide cursor-pointer flex items-center gap-1.5"
-            >
-              🚪 Logout
-            </button>
-          </div>
-        </nav>
+        {/* The Navigation Bar section has been removed. (It will be displayed automatically via app/user/layout.tsx) */}
 
         {/* Hero Banner Section */}
-        <div className="bg-slate-900 text-white py-16 px-4 text-center relative overflow-hidden shadow-md">
+        <div className="bg-slate-900 text-white py-8 px-4 text-center relative overflow-hidden shadow-md">
           <div className="max-w-4xl mx-auto relative z-10">
-            <h1 className="text-4xl md:text-5xl font-black tracking-tight mb-3">
+            <h1 className="text-3xl md:text-4xl font-black tracking-tight mb-2">
               Explore Top Attractions in Sri Lanka
             </h1>
-            <p className="text-slate-300 text-sm md:text-base font-normal max-w-2xl mx-auto">
+            <p className="text-slate-300 text-xs md:text-sm font-normal max-w-2xl mx-auto">
               Discover iconic landmarks, historical ruins, and natural wonders across the island.
             </p>
           </div>
         </div>
 
         {/* Main Content Section */}
-        <main className="max-w-7xl mx-auto px-6 py-12" id="attractions">
-          <h2 className="text-2xl font-bold text-slate-800 mb-8 tracking-tight">
+        <main className="max-w-7xl mx-auto px-6 py-6" id="attractions">
+          <h2 className="text-2xl font-bold text-slate-800 mb-6 tracking-tight">
             Must-Visit Destinations
           </h2>
 
