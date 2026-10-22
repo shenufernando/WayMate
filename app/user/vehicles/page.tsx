@@ -1,73 +1,65 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 
 interface Vehicle {
-  id: string;
-  name: string;
-  category: string;
-  serviceType: 'Self-Drive' | 'With Driver' | 'Both';
-  seats: number;
+  _id: string;
   ownerName: string;
-  contactNumber: string;
+  ownerContact: string;
+  vehicleType: string;
+  vehicleModel: string;
+  capacity: number;
+  serviceType: 'Self-drive' | 'With driver';
   pricePerDay: number;
   pricePerKm?: number;
   image: string;
-  features: string[];
-  status: 'Approved' | 'Pending' | 'Rejected';
+  location: string;
+  status: 'Pending' | 'Approved' | 'Rejected';
+  features?: string[];
 }
 
-const DUMMY_VEHICLES: Vehicle[] = [
-  {
-    id: '1',
-    name: 'Toyota KDH Super GL Van',
-    category: 'Van / Minibus',
-    serviceType: 'With Driver',
-    seats: 9,
-    ownerName: 'Kasun Silva',
-    contactNumber: '94771234567',
-    pricePerDay: 25000,
-    pricePerKm: 180,
-    image: 'https://images.unsplash.com/photo-1533473359331-0135ef1b58bf?auto=format&fit=crop&w=800&q=80',
-    features: ['Dual AC', 'Reclining Seats', 'English Speaking Driver', 'Luggage Space'],
-    status: 'Approved'
-  },
-  {
-    id: '2',
-    name: 'Honda Vezel Z Grade',
-    category: 'SUV / Crossover',
-    serviceType: 'Self-Drive',
-    seats: 5,
-    ownerName: 'Nuwan Perera',
-    contactNumber: '94719876543',
-    pricePerDay: 18000,
-    pricePerKm: 120,
-    image: 'https://images.unsplash.com/photo-1549399542-7e3f8b79c341?auto=format&fit=crop&w=800&q=80',
-    features: ['Automatic', 'Sunroof', 'Bluetooth', 'Unlimited Mileage Option'],
-    status: 'Approved'
-  }
-];
-
 export default function VehiclesPage() {
-  const [vehicles, setVehicles] = useState<Vehicle[]>(DUMMY_VEHICLES);
+  const [vehicles, setVehicles] = useState<Vehicle[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
   const [isPostModalOpen, setIsPostModalOpen] = useState(false);
   const [selectedVehicle, setSelectedVehicle] = useState<Vehicle | null>(null);
 
   // Form State for Posting New Vehicle
   const [postForm, setPostForm] = useState({
-    name: '',
-    category: 'Car',
-    serviceType: 'With Driver',
-    seats: 4,
+    vehicleModel: '',
+    vehicleType: 'Car',
+    serviceType: 'With driver',
+    capacity: 4,
     ownerName: '',
-    contactNumber: '',
+    ownerContact: '',
     pricePerDay: '',
     pricePerKm: '',
+    location: '',
     image: '',
     features: ''
   });
 
-  // Handle Image File Upload & Base64 Conversion
+  // 1. Fetch Approved Vehicles from Backend API
+  const fetchVehicles = async () => {
+    try {
+      setLoading(true);
+      const response = await fetch('http://localhost:5000/api/vehicles/approved');
+      const data = await response.json();
+      if (Array.isArray(data)) {
+        setVehicles(data);
+      }
+    } catch (error) {
+      console.error('Error fetching vehicles:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchVehicles();
+  }, []);
+
+  // 2. Handle Image Upload & Convert to Base64
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -79,52 +71,74 @@ export default function VehiclesPage() {
     }
   };
 
-  // Handle Post Vehicle Form Submit
-  const handlePostSubmit = (e: React.FormEvent) => {
+  // 3. Submit New Vehicle to Backend API
+  const handlePostSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!postForm.image) {
-      alert('Please upload a vehicle image!');
+      alert('Please upload an image of the vehicle!');
       return;
     }
 
-    const newVehicle: Vehicle = {
-      id: Date.now().toString(),
-      name: postForm.name,
-      category: postForm.category,
-      serviceType: postForm.serviceType as any,
-      seats: Number(postForm.seats),
+    const payload = {
       ownerName: postForm.ownerName,
-      contactNumber: postForm.contactNumber,
+      ownerContact: postForm.ownerContact,
+      vehicleType: postForm.vehicleType,
+      vehicleModel: postForm.vehicleModel,
+      capacity: Number(postForm.capacity),
+      serviceType: postForm.serviceType,
       pricePerDay: Number(postForm.pricePerDay),
-      pricePerKm: postForm.pricePerKm ? Number(postForm.pricePerKm) : undefined,
+      pricePerKm: postForm.pricePerKm ? Number(postForm.pricePerKm) : 0,
+      location: postForm.location || 'Sri Lanka',
       image: postForm.image,
-      features: postForm.features.split(',').map((f) => f.trim()),
-      status: 'Pending' // Admin Approval එක සඳහා Pending ලෙස යැවීම
+      features: postForm.features ? postForm.features.split(',').map((f) => f.trim()) : []
     };
 
-    setVehicles([newVehicle, ...vehicles]);
-    alert('Your vehicle post has been submitted successfully! Waiting for Admin verification.');
-    setIsPostModalOpen(false);
-    setPostForm({
-      name: '',
-      category: 'Car',
-      serviceType: 'With Driver',
-      seats: 4,
-      ownerName: '',
-      contactNumber: '',
-      pricePerDay: '',
-      pricePerKm: '',
-      image: '',
-      features: ''
-    });
+    try {
+      const response = await fetch('http://localhost:5000/api/vehicles/add', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (response.ok) {
+        alert('Your vehicle listing has been submitted successfully! Waiting for Admin approval.');
+        setIsPostModalOpen(false);
+        
+        // Reset Form State
+        setPostForm({
+          vehicleModel: '',
+          vehicleType: 'Car',
+          serviceType: 'With driver',
+          capacity: 4,
+          ownerName: '',
+          ownerContact: '',
+          pricePerDay: '',
+          pricePerKm: '',
+          location: '',
+          image: '',
+          features: ''
+        });
+
+        // Refresh List
+        fetchVehicles();
+      } else {
+        const errData = await response.json();
+        alert(`Failed to submit: ${errData.error || 'Server error'}`);
+      }
+    } catch (error) {
+      console.error('Error submitting vehicle:', error);
+      alert('Could not connect to the server. Please ensure Backend is running.');
+    }
   };
 
   return (
     <div className="min-h-screen bg-slate-50 font-sans pb-16">
       {/* Header Banner */}
-      <div className="bg-[#0b1329] text-white py-12 px-4 text-center relative shadow-md">
-        <h1 className="text-3xl sm:text-5xl font-black tracking-tight">Private Vehicles & Drivers</h1>
+      <div className="bg-[#0b1329] text-white py-10 px-4 text-center relative shadow-md">
+        <h1 className="text-3xl sm:text-4xl font-black tracking-tight">Private Vehicles & Drivers</h1>
         <p className="text-slate-300 text-xs sm:text-sm mt-2 max-w-2xl mx-auto">
           Rent vehicles for self-drive or book verified local drivers across Sri Lanka.
         </p>
@@ -138,82 +152,83 @@ export default function VehiclesPage() {
             <p className="text-xs text-slate-500">Browse verified listings or offer your own vehicle</p>
           </div>
 
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() => setIsPostModalOpen(true)}
-              className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs px-5 py-2.5 rounded-xl font-bold transition-all shadow-sm active:scale-95 cursor-pointer flex items-center gap-1.5"
-            >
-              🚗 Post Your Vehicle
-            </button>
-          </div>
+          <button
+            onClick={() => setIsPostModalOpen(true)}
+            className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs px-5 py-2.5 rounded-xl font-bold transition-all shadow-sm active:scale-95 cursor-pointer flex items-center gap-1.5"
+          >
+            🚗 Post Your Vehicle
+          </button>
         </div>
 
         {/* Vehicle Cards Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {vehicles.map((v) => (
-            <div
-              key={v.id}
-              className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm hover:shadow-xl transition-all duration-300 flex flex-col justify-between group"
-            >
-              <div>
-                <div className="relative h-44 w-full overflow-hidden rounded-xl bg-slate-100">
-                  <img
-                    src={v.image}
-                    alt={v.name}
-                    className="h-full w-full object-cover group-hover:scale-105 transition-transform duration-500"
-                  />
-                  <span className="absolute top-3 left-3 bg-slate-900/80 backdrop-blur-md text-white text-[10px] font-bold px-2.5 py-1 rounded-md">
-                    {v.serviceType}
-                  </span>
-                  <span className="absolute top-3 right-3 bg-emerald-500 text-white text-[10px] font-bold px-2.5 py-1 rounded-md">
-                    🪑 {v.seats} Seats
-                  </span>
-                  {v.status === 'Pending' && (
-                    <span className="absolute bottom-3 left-3 bg-amber-500 text-white text-[10px] font-bold px-2.5 py-1 rounded-md">
-                      ⏳ Pending Approval
-                    </span>
-                  )}
-                </div>
-
-                <div className="mt-4">
-                  <span className="text-[11px] font-bold text-emerald-600 uppercase tracking-wider">{v.category}</span>
-                  <h3 className="text-lg font-extrabold text-slate-900 leading-snug">{v.name}</h3>
-
-                  <p className="text-xs text-slate-500 mt-1">
-                    Owner: <span className="font-semibold text-slate-800">{v.ownerName}</span>
-                  </p>
-
-                  <div className="mt-3 flex flex-wrap gap-1.5">
-                    {v.features.map((f, i) => (
-                      <span key={i} className="text-[10px] bg-slate-100 text-slate-600 font-medium px-2 py-0.5 rounded-md border border-slate-200/60">
-                        {f}
+        {loading ? (
+          <div className="flex justify-center items-center py-20">
+            <div className="w-10 h-10 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin"></div>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {vehicles.length > 0 ? (
+              vehicles.map((v) => (
+                <div
+                  key={v._id}
+                  className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm hover:shadow-xl transition-all duration-300 flex flex-col justify-between group"
+                >
+                  <div>
+                    <div className="relative h-44 w-full overflow-hidden rounded-xl bg-slate-100">
+                      <img
+                        src={v.image}
+                        alt={v.vehicleModel}
+                        className="h-full w-full object-cover group-hover:scale-105 transition-transform duration-500"
+                      />
+                      <span className="absolute top-3 left-3 bg-slate-900/80 backdrop-blur-md text-white text-[10px] font-bold px-2.5 py-1 rounded-md">
+                        {v.serviceType}
                       </span>
-                    ))}
+                      <span className="absolute top-3 right-3 bg-emerald-500 text-white text-[10px] font-bold px-2.5 py-1 rounded-md">
+                        🪑 {v.capacity} Seats
+                      </span>
+                    </div>
+
+                    <div className="mt-4">
+                      <span className="text-[11px] font-bold text-emerald-600 uppercase tracking-wider">{v.vehicleType}</span>
+                      <h3 className="text-lg font-extrabold text-slate-900 leading-snug">{v.vehicleModel}</h3>
+
+                      <p className="text-xs text-slate-500 mt-1">
+                        Owner: <span className="font-semibold text-slate-800">{v.ownerName}</span>
+                      </p>
+
+                      {v.location && (
+                        <p className="text-xs text-slate-400 mt-0.5">📍 {v.location}</p>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="mt-6 pt-3 border-t border-slate-100 flex justify-between items-center">
+                    <div>
+                      <span className="text-emerald-600 font-black text-lg">
+                        LKR {v.pricePerDay?.toLocaleString()}{' '}
+                        <span className="text-[10px] text-slate-500 font-normal">/ day</span>
+                      </span>
+                      {v.pricePerKm ? (
+                        <p className="text-[10px] text-slate-400 font-medium">LKR {v.pricePerKm} per KM</p>
+                      ) : null}
+                    </div>
+
+                    <button
+                      onClick={() => setSelectedVehicle(v)}
+                      className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs px-4 py-2.5 rounded-xl font-bold transition-all shadow-sm active:scale-95 cursor-pointer"
+                    >
+                      Book Request
+                    </button>
                   </div>
                 </div>
+              ))
+            ) : (
+              <div className="col-span-full text-center py-16 text-slate-400 bg-white rounded-2xl border border-slate-200">
+                No approved vehicles available at the moment.
               </div>
-
-              <div className="mt-6 pt-3 border-t border-slate-100 flex justify-between items-center">
-                <div>
-                  <span className="text-emerald-600 font-black text-lg">
-                    LKR {v.pricePerDay.toLocaleString()}{' '}
-                    <span className="text-[10px] text-slate-500 font-normal">/ day</span>
-                  </span>
-                  {v.pricePerKm && (
-                    <p className="text-[10px] text-slate-400 font-medium">LKR {v.pricePerKm} per KM</p>
-                  )}
-                </div>
-
-                <button
-                  onClick={() => setSelectedVehicle(v)}
-                  className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs px-4 py-2.5 rounded-xl font-bold transition-all shadow-sm active:scale-95 cursor-pointer"
-                >
-                  Book Request
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
+            )}
+          </div>
+        )}
       </main>
 
       {/* 1. Modal: Post Your Vehicle Form */}
@@ -231,14 +246,14 @@ export default function VehiclesPage() {
 
             <form onSubmit={handlePostSubmit} className="space-y-3 text-xs font-semibold">
               <div>
-                <label className="block text-slate-700 mb-1">Vehicle Name / Model</label>
+                <label className="block text-slate-700 mb-1">Vehicle Model / Name</label>
                 <input
                   type="text"
                   required
                   placeholder="e.g. Toyota Axio / KDH Van"
-                  value={postForm.name}
+                  value={postForm.vehicleModel}
                   className="w-full px-3 py-2 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-emerald-500"
-                  onChange={(e) => setPostForm({ ...postForm, name: e.target.value })}
+                  onChange={(e) => setPostForm({ ...postForm, vehicleModel: e.target.value })}
                 />
               </div>
 
@@ -250,9 +265,8 @@ export default function VehiclesPage() {
                     value={postForm.serviceType}
                     onChange={(e) => setPostForm({ ...postForm, serviceType: e.target.value as any })}
                   >
-                    <option value="With Driver">With Driver</option>
-                    <option value="Self-Drive">Self-Drive</option>
-                    <option value="Both">Both Options</option>
+                    <option value="With driver">With Driver</option>
+                    <option value="Self-drive">Self-Drive</option>
                   </select>
                 </div>
 
@@ -261,9 +275,9 @@ export default function VehiclesPage() {
                   <input
                     type="number"
                     required
-                    value={postForm.seats}
+                    value={postForm.capacity}
                     className="w-full px-3 py-2 border border-slate-200 rounded-xl outline-none"
-                    onChange={(e) => setPostForm({ ...postForm, seats: Number(e.target.value) })}
+                    onChange={(e) => setPostForm({ ...postForm, capacity: Number(e.target.value) })}
                   />
                 </div>
               </div>
@@ -311,12 +325,24 @@ export default function VehiclesPage() {
                   <input
                     type="text"
                     required
-                    placeholder="e.g. 94771234567"
-                    value={postForm.contactNumber}
+                    placeholder="e.g. 0771234567"
+                    value={postForm.ownerContact}
                     className="w-full px-3 py-2 border border-slate-200 rounded-xl outline-none"
-                    onChange={(e) => setPostForm({ ...postForm, contactNumber: e.target.value })}
+                    onChange={(e) => setPostForm({ ...postForm, ownerContact: e.target.value })}
                   />
                 </div>
+              </div>
+
+              <div>
+                <label className="block text-slate-700 mb-1">Location / City</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. Colombo, Kandy"
+                  value={postForm.location}
+                  className="w-full px-3 py-2 border border-slate-200 rounded-xl outline-none"
+                  onChange={(e) => setPostForm({ ...postForm, location: e.target.value })}
+                />
               </div>
 
               {/* File Image Upload */}
@@ -331,20 +357,9 @@ export default function VehiclesPage() {
                 {postForm.image && (
                   <div className="mt-2 flex items-center gap-2">
                     <img src={postForm.image} alt="Preview" className="w-14 h-14 object-cover rounded-lg border" />
-                    <span className="text-[11px] text-emerald-600 font-bold">Image Uploaded Successfully!</span>
+                    <span className="text-[11px] text-emerald-600 font-bold">Image Selected!</span>
                   </div>
                 )}
-              </div>
-
-              <div>
-                <label className="block text-slate-700 mb-1">Key Features (Comma separated)</label>
-                <input
-                  type="text"
-                  placeholder="AC, Bluetooth, Automatic..."
-                  value={postForm.features}
-                  className="w-full px-3 py-2 border border-slate-200 rounded-xl outline-none"
-                  onChange={(e) => setPostForm({ ...postForm, features: e.target.value })}
-                />
               </div>
 
               <button
@@ -370,7 +385,7 @@ export default function VehiclesPage() {
             </button>
 
             <h3 className="text-xl font-black text-slate-800 mb-1">Book Request</h3>
-            <p className="text-xs text-slate-500 mb-4">Requesting: <span className="font-bold text-emerald-600">{selectedVehicle.name}</span></p>
+            <p className="text-xs text-slate-500 mb-4">Requesting: <span className="font-bold text-emerald-600">{selectedVehicle.vehicleModel}</span></p>
 
             <div className="space-y-3 text-xs font-semibold">
               <div className="grid grid-cols-2 gap-2">
@@ -396,7 +411,7 @@ export default function VehiclesPage() {
 
               <button
                 onClick={() => {
-                  alert(`Booking Request Sent to Owner (${selectedVehicle.ownerName})! You will get notified once confirmed.`);
+                  alert(`Booking Request Sent to Owner (${selectedVehicle.ownerName})! Owner Contact: ${selectedVehicle.ownerContact}`);
                   setSelectedVehicle(null);
                 }}
                 className="w-full bg-emerald-600 hover:bg-emerald-700 text-white py-3 rounded-xl font-bold transition-all shadow-md mt-2 cursor-pointer"
