@@ -66,6 +66,29 @@ export default function AdminVehiclesPage() {
     }
   };
 
+  // 3. Handle vehicle deletion
+  const handleDeleteVehicle = async (id: string, modelName: string) => {
+    const isConfirmed = confirm(`Are you sure you want to delete "${modelName}"? This action cannot be undone.`);
+    
+    if (!isConfirmed) return;
+
+    try {
+      const response = await fetch(`http://localhost:5000/api/vehicles/${id}`, {
+        method: 'DELETE',
+      });
+
+      if (response.ok) {
+        alert('Vehicle listing deleted successfully!');
+        fetchAllVehicles(); // Refresh list
+      } else {
+        alert('Failed to delete vehicle listing.');
+      }
+    } catch (error) {
+      console.error('Error deleting vehicle:', error);
+      alert('Server connection error.');
+    }
+  };
+
   // Filter vehicles based on selected tab
   const filteredVehicles = vehicles.filter((v) => {
     if (filterStatus === 'All') return true;
@@ -77,11 +100,11 @@ export default function AdminVehiclesPage() {
       {/* Header Banner */}
       <div className="bg-slate-900 text-white py-10 px-4 text-center shadow-md">
         <h1 className="text-3xl font-black tracking-tight">Admin Moderation: Vehicles & Drivers</h1>
-        <p className="text-slate-300 text-xs mt-1">Review, approve, or reject user-submitted vehicle rental listings.</p>
+        <p className="text-slate-300 text-xs mt-1">Review, approve, reject, or delete user-submitted vehicle rental listings.</p>
       </div>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Filter Tabs */}
+        {/* Filter Tabs including Delete/Trash view option or filter */}
         <div className="flex flex-wrap items-center justify-between gap-4 mb-6 bg-white p-4 rounded-2xl border border-slate-200/80 shadow-sm">
           <div className="flex items-center gap-2">
             {['All', 'Pending', 'Approved', 'Rejected'].map((status) => (
@@ -99,9 +122,11 @@ export default function AdminVehiclesPage() {
             ))}
           </div>
 
-          <span className="text-xs font-semibold text-slate-500">
-            Total Listings: <span className="font-bold text-slate-800">{filteredVehicles.length}</span>
-          </span>
+          <div className="flex items-center gap-3">
+            <span className="text-xs font-semibold text-slate-500">
+              Total Listings: <span className="font-bold text-slate-800">{filteredVehicles.length}</span>
+            </span>
+          </div>
         </div>
 
         {/* Vehicles Table / Grid */}
@@ -149,7 +174,7 @@ export default function AdminVehiclesPage() {
                     </div>
                   </div>
 
-                  {/* Moderation Actions */}
+                  {/* Moderation Actions & Delete Button */}
                   <div className="mt-5 pt-3 border-t border-slate-100 flex items-center gap-2">
                     {v.status !== 'Approved' && (
                       <button
@@ -162,11 +187,18 @@ export default function AdminVehiclesPage() {
                     {v.status !== 'Rejected' && (
                       <button
                         onClick={() => handleStatusChange(v._id, 'Rejected')}
-                        className="flex-1 bg-rose-500 hover:bg-rose-600 text-white text-xs py-2 rounded-xl font-bold transition-all shadow-sm cursor-pointer"
+                        className="flex-1 bg-amber-500 hover:bg-amber-600 text-white text-xs py-2 rounded-xl font-bold transition-all shadow-sm cursor-pointer"
                       >
                         Reject
                       </button>
                     )}
+                    <button
+                      onClick={() => handleDeleteVehicle(v._id, v.vehicleModel)}
+                      className="bg-rose-600 hover:bg-rose-700 text-white text-xs px-3 py-2 rounded-xl font-bold transition-all shadow-sm cursor-pointer flex items-center gap-1"
+                      title="Delete Listing"
+                    >
+                      🗑️ Delete
+                    </button>
                   </div>
                 </div>
               ))

@@ -20,6 +20,8 @@ interface Vehicle {
 
 export default function VehiclesPage() {
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
+  const [myListings, setMyListings] = useState<Vehicle[]>([]);
+  const [activeTab, setActiveTab] = useState<'browse' | 'myListings'>('browse');
   const [loading, setLoading] = useState<boolean>(true);
   const [isPostModalOpen, setIsPostModalOpen] = useState(false);
   const [selectedVehicle, setSelectedVehicle] = useState<Vehicle | null>(null);
@@ -39,8 +41,8 @@ export default function VehiclesPage() {
     features: ''
   });
 
-  // 1. Fetch Approved Vehicles from Backend API
-  const fetchVehicles = async () => {
+  // 1. Fetch Approved Vehicles for Public Browse
+  const fetchApprovedVehicles = async () => {
     try {
       setLoading(true);
       const response = await fetch('http://localhost:5000/api/vehicles/approved');
@@ -49,17 +51,31 @@ export default function VehiclesPage() {
         setVehicles(data);
       }
     } catch (error) {
-      console.error('Error fetching vehicles:', error);
+      console.error('Error fetching approved vehicles:', error);
     } finally {
       setLoading(false);
     }
   };
 
+  // 2. Fetch ALL vehicles to let user track their own posts (Pending, Approved, Rejected)
+  const fetchAllVehiclesForTracking = async () => {
+    try {
+      const response = await fetch('http://localhost:5000/api/vehicles/all');
+      const data = await response.json();
+      if (Array.isArray(data)) {
+        setMyListings(data);
+      }
+    } catch (error) {
+      console.error('Error fetching all listings:', error);
+    }
+  };
+
   useEffect(() => {
-    fetchVehicles();
+    fetchApprovedVehicles();
+    fetchAllVehiclesForTracking();
   }, []);
 
-  // 2. Handle Image Upload & Convert to Base64
+  // 3. Handle Image Upload & Convert to Base64
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -71,7 +87,7 @@ export default function VehiclesPage() {
     }
   };
 
-  // 3. Submit New Vehicle to Backend API
+  // 4. Submit New Vehicle to Backend API
   const handlePostSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -122,8 +138,9 @@ export default function VehiclesPage() {
           features: ''
         });
 
-        // Refresh List
-        fetchVehicles();
+        // Refresh Lists
+        fetchApprovedVehicles();
+        fetchAllVehiclesForTracking();
       } else {
         const errData = await response.json();
         alert(`Failed to submit: ${errData.error || 'Server error'}`);
@@ -131,6 +148,29 @@ export default function VehiclesPage() {
     } catch (error) {
       console.error('Error submitting vehicle:', error);
       alert('Could not connect to the server. Please ensure Backend is running.');
+    }
+  };
+
+  // 5. Delete User's Own Vehicle Listing
+  const handleDeleteMyListing = async (id: string, modelName: string) => {
+    const isConfirmed = confirm(`Are you sure you want to delete your submission for "${modelName}"?`);
+    if (!isConfirmed) return;
+
+    try {
+      const response = await fetch(`http://localhost:5000/api/vehicles/${id}`, {
+        method: 'DELETE',
+      });
+
+      if (response.ok) {
+        alert('Your vehicle listing has been deleted successfully!');
+        fetchApprovedVehicles();
+        fetchAllVehiclesForTracking();
+      } else {
+        alert('Failed to delete the listing.');
+      }
+    } catch (error) {
+      console.error('Error deleting vehicle:', error);
+      alert('Server connection error.');
     }
   };
 
@@ -145,86 +185,181 @@ export default function VehiclesPage() {
       </div>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Actions Bar */}
+        {/* Actions Bar & View Toggle Tabs */}
         <div className="flex flex-col sm:flex-row justify-between items-center mb-8 gap-4 bg-white p-4 rounded-2xl border border-slate-200/80 shadow-sm">
-          <div>
-            <h2 className="text-lg font-extrabold text-slate-800">Available Rental Vehicles</h2>
-            <p className="text-xs text-slate-500">Browse verified listings or offer your own vehicle</p>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setActiveTab('browse')}
+              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                activeTab === 'browse'
+                  ? 'bg-emerald-600 text-white shadow-sm'
+                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+              }`}
+            >
+              🚗 Browse Approved Vehicles
+            </button>
+            <button
+              onClick={() => setActiveTab('myListings')}
+              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                activeTab === 'myListings'
+                  ? 'bg-emerald-600 text-white shadow-sm'
+                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+              }`}
+            >
+              📋 Track My Submissions / Status
+            </button>
           </div>
 
           <button
             onClick={() => setIsPostModalOpen(true)}
             className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs px-5 py-2.5 rounded-xl font-bold transition-all shadow-sm active:scale-95 cursor-pointer flex items-center gap-1.5"
           >
-            🚗 Post Your Vehicle
+            ➕ Post Your Vehicle
           </button>
         </div>
 
-        {/* Vehicle Cards Grid */}
+        {/* Content Display based on Active Tab */}
         {loading ? (
           <div className="flex justify-center items-center py-20">
             <div className="w-10 h-10 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin"></div>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {vehicles.length > 0 ? (
-              vehicles.map((v) => (
-                <div
-                  key={v._id}
-                  className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm hover:shadow-xl transition-all duration-300 flex flex-col justify-between group"
-                >
-                  <div>
-                    <div className="relative h-44 w-full overflow-hidden rounded-xl bg-slate-100">
-                      <img
-                        src={v.image}
-                        alt={v.vehicleModel}
-                        className="h-full w-full object-cover group-hover:scale-105 transition-transform duration-500"
-                      />
-                      <span className="absolute top-3 left-3 bg-slate-900/80 backdrop-blur-md text-white text-[10px] font-bold px-2.5 py-1 rounded-md">
-                        {v.serviceType}
-                      </span>
-                      <span className="absolute top-3 right-3 bg-emerald-500 text-white text-[10px] font-bold px-2.5 py-1 rounded-md">
-                        🪑 {v.capacity} Seats
-                      </span>
-                    </div>
-
-                    <div className="mt-4">
-                      <span className="text-[11px] font-bold text-emerald-600 uppercase tracking-wider">{v.vehicleType}</span>
-                      <h3 className="text-lg font-extrabold text-slate-900 leading-snug">{v.vehicleModel}</h3>
-
-                      <p className="text-xs text-slate-500 mt-1">
-                        Owner: <span className="font-semibold text-slate-800">{v.ownerName}</span>
-                      </p>
-
-                      {v.location && (
-                        <p className="text-xs text-slate-400 mt-0.5">📍 {v.location}</p>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="mt-6 pt-3 border-t border-slate-100 flex justify-between items-center">
-                    <div>
-                      <span className="text-emerald-600 font-black text-lg">
-                        LKR {v.pricePerDay?.toLocaleString()}{' '}
-                        <span className="text-[10px] text-slate-500 font-normal">/ day</span>
-                      </span>
-                      {v.pricePerKm ? (
-                        <p className="text-[10px] text-slate-400 font-medium">LKR {v.pricePerKm} per KM</p>
-                      ) : null}
-                    </div>
-
-                    <button
-                      onClick={() => setSelectedVehicle(v)}
-                      className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs px-4 py-2.5 rounded-xl font-bold transition-all shadow-sm active:scale-95 cursor-pointer"
+          <div>
+            {activeTab === 'browse' ? (
+              /* Browse Approved Vehicles */
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {vehicles.length > 0 ? (
+                  vehicles.map((v) => (
+                    <div
+                      key={v._id}
+                      className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm hover:shadow-xl transition-all duration-300 flex flex-col justify-between group"
                     >
-                      Book Request
-                    </button>
+                      <div>
+                        <div className="relative h-44 w-full overflow-hidden rounded-xl bg-slate-100">
+                          <img
+                            src={v.image}
+                            alt={v.vehicleModel}
+                            className="h-full w-full object-cover group-hover:scale-105 transition-transform duration-500"
+                          />
+                          <span className="absolute top-3 left-3 bg-slate-900/80 backdrop-blur-md text-white text-[10px] font-bold px-2.5 py-1 rounded-md">
+                            {v.serviceType}
+                          </span>
+                          <span className="absolute top-3 right-3 bg-emerald-500 text-white text-[10px] font-bold px-2.5 py-1 rounded-md">
+                            🪑 {v.capacity} Seats
+                          </span>
+                        </div>
+
+                        <div className="mt-4">
+                          <span className="text-[11px] font-bold text-emerald-600 uppercase tracking-wider">{v.vehicleType}</span>
+                          <h3 className="text-lg font-extrabold text-slate-900 leading-snug">{v.vehicleModel}</h3>
+
+                          <p className="text-xs text-slate-500 mt-1">
+                            Owner: <span className="font-semibold text-slate-800">{v.ownerName}</span>
+                          </p>
+
+                          {v.location && (
+                            <p className="text-xs text-slate-400 mt-0.5">📍 {v.location}</p>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="mt-6 pt-3 border-t border-slate-100 flex justify-between items-center">
+                        <div>
+                          <span className="text-emerald-600 font-black text-lg">
+                            LKR {v.pricePerDay?.toLocaleString()}{' '}
+                            <span className="text-[10px] text-slate-500 font-normal">/ day</span>
+                          </span>
+                          {v.pricePerKm ? (
+                            <p className="text-[10px] text-slate-400 font-medium">LKR {v.pricePerKm} per KM</p>
+                          ) : null}
+                        </div>
+
+                        <button
+                          onClick={() => setSelectedVehicle(v)}
+                          className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs px-4 py-2.5 rounded-xl font-bold transition-all shadow-sm active:scale-95 cursor-pointer"
+                        >
+                          Book Request
+                        </button>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <div className="col-span-full text-center py-16 text-slate-400 bg-white rounded-2xl border border-slate-200">
+                    No approved vehicles available at the moment.
                   </div>
-                </div>
-              ))
+                )}
+              </div>
             ) : (
-              <div className="col-span-full text-center py-16 text-slate-400 bg-white rounded-2xl border border-slate-200">
-                No approved vehicles available at the moment.
+              /* Track My Submissions & Status with Delete Option */
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {myListings.length > 0 ? (
+                  myListings.map((v) => (
+                    <div
+                      key={v._id}
+                      className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm flex flex-col justify-between"
+                    >
+                      <div>
+                        <div className="relative h-44 w-full overflow-hidden rounded-xl bg-slate-100">
+                          <img src={v.image} alt={v.vehicleModel} className="h-full w-full object-cover" />
+                          <span className="absolute top-3 left-3 bg-slate-900/80 text-white text-[10px] font-bold px-2 py-1 rounded">
+                            {v.serviceType}
+                          </span>
+                          {/* Status Badge */}
+                          <span
+                            className={`absolute top-3 right-3 text-[10px] font-bold px-2.5 py-1 rounded text-white ${
+                              v.status === 'Approved'
+                                ? 'bg-emerald-600'
+                                : v.status === 'Pending'
+                                ? 'bg-amber-500'
+                                : 'bg-rose-500'
+                            }`}
+                          >
+                            {v.status === 'Pending' && '⏳ Pending Admin Approval'}
+                            {v.status === 'Approved' && '✅ Approved & Live'}
+                            {v.status === 'Rejected' && '❌ Rejected by Admin'}
+                          </span>
+                        </div>
+
+                        <div className="mt-4">
+                          <span className="text-[11px] font-bold text-emerald-600 uppercase tracking-wider">{v.vehicleType}</span>
+                          <h3 className="text-lg font-extrabold text-slate-900">{v.vehicleModel}</h3>
+
+                          <div className="mt-2 text-xs text-slate-600 space-y-1 bg-slate-50 p-3 rounded-xl border border-slate-100">
+                            <p>👤 Owner: <span className="font-bold text-slate-800">{v.ownerName}</span></p>
+                            <p>📞 Contact: <span className="font-bold text-slate-800">{v.ownerContact}</span></p>
+                            <p>📍 Location: <span className="font-bold text-slate-800">{v.location}</span></p>
+                            <p>💰 Daily Rate: <span className="font-bold text-emerald-600">LKR {v.pricePerDay?.toLocaleString()}</span></p>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div>
+                        {v.status === 'Rejected' && (
+                          <div className="mt-4 bg-rose-50 border border-rose-200 p-2.5 rounded-xl text-[11px] text-rose-700 font-semibold text-center">
+                            ⚠️ Your listing was rejected by admin.
+                          </div>
+                        )}
+                        {v.status === 'Pending' && (
+                          <div className="mt-4 bg-amber-50 border border-amber-200 p-2.5 rounded-xl text-[11px] text-amber-700 font-semibold text-center">
+                            🕒 Waiting for moderation.
+                          </div>
+                        )}
+
+                        {/* Delete Button for User's Submission */}
+                        <button
+                          onClick={() => handleDeleteMyListing(v._id, v.vehicleModel)}
+                          className="w-full mt-4 bg-rose-600 hover:bg-rose-700 text-white text-xs py-2.5 rounded-xl font-bold transition-all shadow-sm cursor-pointer flex items-center justify-center gap-1.5"
+                        >
+                          🗑️ Delete Listing
+                        </button>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <div className="col-span-full text-center py-16 text-slate-400 bg-white rounded-2xl border border-slate-200">
+                    You haven't posted any vehicle listings yet.
+                  </div>
+                )}
               </div>
             )}
           </div>

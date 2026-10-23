@@ -13,16 +13,17 @@ router.post('/add', async (req, res) => {
   }
 });
 
-// 2. Adding only approved vehicles to the User Dashboard
+// 2. Fetch only APPROVED vehicles for the User Dashboard
+router.get('/approved', async (req, res) => {
   try {
-    const vehicles = await Vehicle.find({ status: 'Approved' });
+    const vehicles = await Vehicle.find({ status: 'Approved' }).sort({ createdAt: -1 });
     res.status(200).json(vehicles);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 });
 
-// 3. Importing all vehicles into the Admin Dashboard
+// 3. Fetch ALL vehicles for the Admin Dashboard
 router.get('/all', async (req, res) => {
   try {
     const vehicles = await Vehicle.find().sort({ createdAt: -1 });
@@ -32,7 +33,7 @@ router.get('/all', async (req, res) => {
   }
 });
 
-// 4. Admin Approve / Reject the vehicle
+// 4. Admin Approve / Reject the vehicle status
 router.patch('/status/:id', async (req, res) => {
   try {
     const { status } = req.body;
@@ -42,6 +43,19 @@ router.patch('/status/:id', async (req, res) => {
       { new: true }
     );
     res.status(200).json({ message: `Vehicle status updated to ${status}`, vehicle: updatedVehicle });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// 5. Delete a vehicle listing by ID
+router.delete('/:id', async (req, res) => {
+  try {
+    const deletedVehicle = await Vehicle.findByIdAndDelete(req.params.id);
+    if (!deletedVehicle) {
+      return res.status(404).json({ message: "Vehicle not found" });
+    }
+    res.status(200).json({ message: "Vehicle deleted successfully!" });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
