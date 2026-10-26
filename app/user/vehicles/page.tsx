@@ -19,6 +19,7 @@ interface Vehicle {
   status: 'Pending' | 'Approved' | 'Rejected';
 }
 
+// Message interface supporting text, image, and audio (voice note)
 interface Message {
   _id?: string;
   sender: 'owner' | 'user';
@@ -28,6 +29,7 @@ interface Message {
   timestamp: string;
 }
 
+// Booking interface definition
 interface Booking {
   _id: string;
   vehicleId: string;
@@ -88,11 +90,13 @@ export default function VehiclesPage() {
 
   const [isSubmittingBooking, setIsSubmittingBooking] = useState(false);
 
+  // Chat states for text, image preview, and voice recording
   const [chatText, setChatText] = useState('');
   const [chatImage, setChatImage] = useState('');
   const [recording, setRecording] = useState(false);
   const [mediaRecorder, setMediaRecorder] = useState<MediaRecorder | null>(null);
 
+  // Load user session and data on mount
   useEffect(() => {
     const storedUser = localStorage.getItem('user') || localStorage.getItem('waymate_user');
     const storedEmail = localStorage.getItem('userEmail') || localStorage.getItem('waymate_user_email');
@@ -131,6 +135,7 @@ export default function VehiclesPage() {
     fetchApprovedVehicles();
   }, []);
 
+  // Refresh user-specific data lists
   const refreshUserData = (email: string) => {
     if (!email) return;
     fetchMyListings(email);
@@ -138,6 +143,7 @@ export default function VehiclesPage() {
     loadUserBookings(email);
   };
 
+  // Fetch all approved vehicles
   const fetchApprovedVehicles = async () => {
     try {
       setLoading(true);
@@ -151,6 +157,7 @@ export default function VehiclesPage() {
     }
   };
 
+  // Fetch listings posted by the owner
   const fetchMyListings = async (email: string) => {
     try {
       const cleanEmail = email.toLowerCase().trim();
@@ -167,6 +174,7 @@ export default function VehiclesPage() {
     }
   };
 
+  // Fetch incoming booking requests for the owner
   const loadIncomingRequests = async (email: string) => {
     try {
       const cleanEmail = email.toLowerCase().trim();
@@ -178,6 +186,7 @@ export default function VehiclesPage() {
     }
   };
 
+  // Fetch bookings created by the user
   const loadUserBookings = async (email: string) => {
     try {
       const cleanEmail = email.toLowerCase().trim();
@@ -189,6 +198,7 @@ export default function VehiclesPage() {
     }
   };
 
+  // Handle image conversion to Base64 (for vehicle listing or chat)
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>, isChat = false) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -204,6 +214,40 @@ export default function VehiclesPage() {
     }
   };
 
+  // Start voice recording for chat
+  const startRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const recorder = new MediaRecorder(stream);
+      const chunks: BlobPart[] = [];
+
+      recorder.ondataavailable = (e) => chunks.push(e.data);
+      recorder.onstop = () => {
+        const blob = new Blob(chunks, { type: 'audio/webm' });
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          sendChatMessage('', '', reader.result as string);
+        };
+        reader.readAsDataURL(blob);
+      };
+
+      recorder.start();
+      setMediaRecorder(recorder);
+      setRecording(true);
+    } catch (err) {
+      alert('Microphone access is required to record voice notes!');
+    }
+  };
+
+  // Stop voice recording
+  const stopRecording = () => {
+    if (mediaRecorder) {
+      mediaRecorder.stop();
+      setRecording(false);
+    }
+  };
+
+  // Submit new vehicle post
   const handlePostSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -250,6 +294,7 @@ export default function VehiclesPage() {
     }
   };
 
+  // Delete vehicle listing
   const handleDeleteListing = async (vehicleId: string) => {
     if (!confirm('Are you sure you want to delete this listing?')) return;
     try {
@@ -280,7 +325,7 @@ export default function VehiclesPage() {
       vehicleId: selectedVehicle._id,
       vehicleModel: selectedVehicle.vehicleModel,
       ownerEmail: selectedVehicle.ownerEmail.toLowerCase().trim(),
-      ownerContact: selectedVehicle.ownerContact || 'N/A', // 👈 Added ownerContact to prevent validation error
+      ownerContact: selectedVehicle.ownerContact || 'N/A',
       userName: bookingForm.userName || currentUserName,
       userEmail: currentUserEmail.toLowerCase().trim(),
       userContact: bookingForm.userContact,
@@ -342,12 +387,13 @@ export default function VehiclesPage() {
     }
   };
 
+  // Permanently delete booking from database
   const handleDeleteBooking = async (bookingId: string) => {
-    if (!confirm('Delete this booking request?')) return;
+    if (!confirm('Are you sure you want to permanently delete this booking?')) return;
     try {
       const res = await fetch(`http://localhost:5000/api/bookings/${bookingId}`, { method: 'DELETE' });
       if (res.ok) {
-        alert('Booking request deleted!');
+        alert('Booking deleted from database successfully!');
         if (activeChatBooking && activeChatBooking._id === bookingId) {
           setActiveChatBooking(null);
         }
@@ -358,6 +404,7 @@ export default function VehiclesPage() {
     }
   };
 
+  // Send message, image, or voice note in chat
   const sendChatMessage = async (text?: string, image?: string, audio?: string) => {
     if (!activeChatBooking) return;
     const isOwner = currentUserEmail === activeChatBooking.ownerEmail.toLowerCase().trim();
@@ -440,7 +487,8 @@ export default function VehiclesPage() {
               </button>
             )}
 
-            {currentUserEmail && myListings.length > 0 && (
+            {/* Incoming Requests Tab - Automatically hides if no requests exist */}
+            {currentUserEmail && incomingBookings.length > 0 && (
               <button
                 onClick={() => setActiveTab('incomingBookings')}
                 className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all ${
@@ -584,16 +632,15 @@ export default function VehiclesPage() {
                           <button onClick={() => handleUpdateBookingStatus(b._id, 'Cancelled')} className="bg-amber-600 hover:bg-amber-700 text-white px-4 py-2.5 rounded-xl text-xs font-bold">❌ Cancel</button>
                         </>
                       )}
-                      {b.status === 'Pending' && (
-                        <button onClick={() => handleDeleteBooking(b._id)} className="bg-rose-600 hover:bg-rose-700 text-white px-4 py-2.5 rounded-xl text-xs font-bold">🗑️ Cancel Request</button>
-                      )}
+                      {/* Permanent Delete Booking Button */}
+                      <button onClick={() => handleDeleteBooking(b._id)} className="bg-rose-600 hover:bg-rose-700 text-white px-4 py-2.5 rounded-xl text-xs font-bold">🗑️ Delete Booking</button>
                     </div>
                   </div>
                 ))}
               </div>
             )}
 
-            {activeTab === 'incomingBookings' && currentUserEmail && myListings.length > 0 && (
+            {activeTab === 'incomingBookings' && currentUserEmail && incomingBookings.length > 0 && (
               <div className="space-y-4">
                 <h2 className="text-xl font-black text-slate-800 mb-4">Incoming Requests for Your Vehicles</h2>
                 {incomingBookings.map((b) => (
@@ -618,7 +665,6 @@ export default function VehiclesPage() {
                         <>
                           <button onClick={() => handleUpdateBookingStatus(b._id, 'Accepted')} className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2.5 rounded-xl text-xs font-bold">✅ Accept</button>
                           <button onClick={() => handleUpdateBookingStatus(b._id, 'Rejected')} className="bg-amber-500 hover:bg-amber-600 text-white px-4 py-2.5 rounded-xl text-xs font-bold">🚫 Reject</button>
-                          <button onClick={() => handleDeleteBooking(b._id)} className="bg-rose-600 hover:bg-rose-700 text-white px-4 py-2.5 rounded-xl text-xs font-bold">🗑️ Delete</button>
                         </>
                       )}
 
@@ -629,6 +675,9 @@ export default function VehiclesPage() {
                           <button onClick={() => handleUpdateBookingStatus(b._id, 'Cancelled')} className="bg-rose-600 hover:bg-rose-700 text-white px-4 py-2.5 rounded-xl text-xs font-bold">❌ Cancel</button>
                         </>
                       )}
+                      
+                      {/* Permanent Delete Booking Button */}
+                      <button onClick={() => handleDeleteBooking(b._id)} className="bg-rose-600 hover:bg-rose-700 text-white px-4 py-2.5 rounded-xl text-xs font-bold">🗑️ Delete</button>
                     </div>
                   </div>
                 ))}
@@ -738,97 +787,10 @@ export default function VehiclesPage() {
         </div>
       )}
 
-      {/* POST MODAL WITH AUTO VEHICLE TYPE DETECTION */}
-      {isPostModalOpen && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl relative max-h-[90vh] overflow-y-auto">
-            <button onClick={() => setIsPostModalOpen(false)} className="absolute top-4 right-4 text-slate-400 font-bold">✕</button>
-            <h3 className="text-xl font-black text-slate-800 mb-1">Post Your Vehicle / Driver Service</h3>
-            <p className="text-xs text-slate-500 mb-4">List your vehicle for hire. Admin review required before public listing.</p>
-
-            <form onSubmit={handlePostSubmit} className="space-y-3 text-xs font-semibold">
-              <div>
-                <label className="block text-slate-700 font-bold mb-1">Vehicle Model / Name (Auto detects Car/Van)</label>
-                <input 
-                  type="text" 
-                  required 
-                  placeholder="e.g. Toyota Hiace Van / Aqua" 
-                  value={postForm.vehicleModel} 
-                  onChange={(e) => {
-                    const model = e.target.value;
-                    let vType = 'Car';
-                    const lower = model.toLowerCase();
-                    if (lower.includes('van') || lower.includes('hiace') || lower.includes('kdh')) {
-                      vType = 'Van';
-                    } else if (lower.includes('suv') || lower.includes('jeep') || lower.includes('prado')) {
-                      vType = 'SUV';
-                    } else if (lower.includes('bike') || lower.includes('scooter')) {
-                      vType = 'Bike';
-                    }
-                    setPostForm({ ...postForm, vehicleModel: model, vehicleType: vType });
-                  }} 
-                  className="w-full px-3.5 py-2.5 border rounded-xl outline-none" 
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-slate-700 font-bold mb-1">Service Option</label>
-                  <select value={postForm.serviceType} onChange={(e) => setPostForm({ ...postForm, serviceType: e.target.value as any })} className="w-full px-3.5 py-2.5 border rounded-xl">
-                    <option value="With driver">With Driver</option>
-                    <option value="Self-drive">Self-drive</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-slate-700 font-bold mb-1">Seats Capacity</label>
-                  <input type="number" required placeholder="4" value={postForm.capacity} onChange={(e) => setPostForm({ ...postForm, capacity: Number(e.target.value) })} className="w-full px-3.5 py-2.5 border rounded-xl outline-none" />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-slate-700 font-bold mb-1">Daily Rate (LKR)</label>
-                  <input type="number" required placeholder="e.g. 15000" value={postForm.pricePerDay} onChange={(e) => setPostForm({ ...postForm, pricePerDay: e.target.value })} className="w-full px-3.5 py-2.5 border rounded-xl outline-none" />
-                </div>
-                <div>
-                  <label className="block text-slate-700 font-bold mb-1">Rate per KM (Optional)</label>
-                  <input type="number" placeholder="e.g. 150" value={postForm.pricePerKm} onChange={(e) => setPostForm({ ...postForm, pricePerKm: e.target.value })} className="w-full px-3.5 py-2.5 border rounded-xl outline-none" />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-slate-700 font-bold mb-1">Owner Name</label>
-                  <input type="text" required placeholder="Your Name" value={postForm.ownerName} onChange={(e) => setPostForm({ ...postForm, ownerName: e.target.value })} className="w-full px-3.5 py-2.5 border rounded-xl outline-none" />
-                </div>
-                <div>
-                  <label className="block text-slate-700 font-bold mb-1">WhatsApp / Phone No</label>
-                  <input type="text" required placeholder="e.g. 0771234567" value={postForm.ownerContact} onChange={(e) => setPostForm({ ...postForm, ownerContact: e.target.value })} className="w-full px-3.5 py-2.5 border rounded-xl outline-none" />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-slate-700 font-bold mb-1">Location / City</label>
-                <input type="text" required placeholder="e.g. Colombo" value={postForm.location} onChange={(e) => setPostForm({ ...postForm, location: e.target.value })} className="w-full px-3.5 py-2.5 border rounded-xl outline-none" />
-              </div>
-
-              <div>
-                <label className="block text-slate-700 font-bold mb-1">Vehicle Image</label>
-                <input type="file" accept="image/*" required onChange={(e) => handleImageUpload(e)} className="w-full text-xs" />
-              </div>
-
-              <button type="submit" className="w-full bg-emerald-600 hover:bg-emerald-700 text-white py-3 rounded-xl font-bold transition-all shadow-md mt-2">
-                Submit Post for Approval
-              </button>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* LIVE CHAT MODAL */}
+      {/* LIVE CHAT MODAL WITH IMAGE & VOICE NOTE SUPPORT */}
       {activeChatBooking && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl relative flex flex-col h-[80vh]">
+          <div className="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl relative flex flex-col h-[85vh]">
             <div className="flex justify-between items-center pb-3 border-b">
               <div>
                 <h3 className="text-base font-black text-slate-800">Live Chat: {activeChatBooking.vehicleModel}</h3>
@@ -837,6 +799,7 @@ export default function VehiclesPage() {
               <button onClick={() => setActiveChatBooking(null)} className="text-slate-400 font-bold">✕</button>
             </div>
 
+            {/* Messages Display Area */}
             <div className="flex-1 overflow-y-auto py-4 space-y-3">
               {activeChatBooking.messages?.map((msg, index) => {
                 const isOwner = currentUserEmail === activeChatBooking.ownerEmail.toLowerCase().trim();
@@ -845,23 +808,195 @@ export default function VehiclesPage() {
                 return (
                   <div key={index} className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}>
                     <div className={`max-w-[75%] p-3 rounded-2xl text-xs ${isMe ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-800'}`}>
-                      <p>{msg.text}</p>
+                      {msg.text && <p className="leading-relaxed">{msg.text}</p>}
+                      {msg.image && <img src={msg.image} alt="uploaded attachment" className="mt-2 rounded-xl max-h-48 object-cover w-full" />}
+                      {msg.audio && <audio controls src={msg.audio} className="mt-2 max-w-full h-9" />}
                     </div>
                   </div>
                 );
               })}
             </div>
 
+            {/* Chat Image Preview if selected */}
+            {chatImage && (
+              <div className="p-2.5 bg-slate-100 rounded-xl mb-2 flex items-center justify-between">
+                <span className="text-[11px] text-slate-600 truncate">📷 Image attached and ready to send</span>
+                <button onClick={() => setChatImage('')} className="text-rose-600 font-bold text-xs hover:underline">Remove</button>
+              </div>
+            )}
+
+            {/* Chat Input Controls (Text, Image Upload, Voice Recorder) */}
             <div className="pt-3 border-t flex items-center gap-2">
+              {/* Image Upload Button */}
+              <label className="cursor-pointer bg-slate-100 hover:bg-slate-200 p-2.5 rounded-xl text-xs transition-colors flex items-center justify-center" title="Attach Image">
+                📷
+                <input type="file" accept="image/*" onChange={(e) => handleImageUpload(e, true)} className="hidden" />
+              </label>
+
+              {/* Voice Record Button */}
+              <button 
+                onClick={recording ? stopRecording : startRecording}
+                className={`p-2.5 rounded-xl text-xs font-bold transition-colors ${recording ? 'bg-rose-600 text-white animate-pulse' : 'bg-slate-100 hover:bg-slate-200 text-slate-700'}`}
+                title={recording ? 'Stop Recording' : 'Record Voice Note'}
+              >
+                🎙️ {recording ? 'Stop' : ''}
+              </button>
+
               <input 
                 type="text" 
                 placeholder="Type a message..." 
                 value={chatText} 
                 onChange={(e) => setChatText(e.target.value)}
-                className="flex-1 px-3.5 py-2.5 border rounded-xl text-xs outline-none"
+                onKeyDown={(e) => { if (e.key === 'Enter') sendChatMessage(); }}
+                className="flex-1 px-3.5 py-2.5 border rounded-xl text-xs outline-none focus:ring-2 focus:ring-emerald-500"
               />
-              <button onClick={() => sendChatMessage()} className="bg-emerald-600 text-white px-4 py-2.5 rounded-xl text-xs font-bold">Send</button>
+              
+              <button 
+                onClick={() => sendChatMessage()} 
+                className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2.5 rounded-xl text-xs font-bold transition-all shadow-sm"
+              >
+                Send
+              </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* POST VEHICLE MODAL */}
+      {isPostModalOpen && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl relative max-h-[90vh] overflow-y-auto">
+            <button onClick={() => setIsPostModalOpen(false)} className="absolute top-4 right-4 text-slate-400 font-bold">✕</button>
+            <h3 className="text-xl font-black text-slate-800 mb-1">Post Your Vehicle</h3>
+            <p className="text-xs text-slate-500 mb-4">Fill in your vehicle details to list it on WayMate.</p>
+
+            <form onSubmit={handlePostSubmit} className="space-y-3 text-xs font-semibold">
+              <div>
+                <label className="block text-slate-700 font-bold mb-1">Vehicle Model / Name</label>
+                <input 
+                  type="text" 
+                  required 
+                  placeholder="e.g. Toyota KDH / Prius" 
+                  value={postForm.vehicleModel} 
+                  onChange={(e) => setPostForm({ ...postForm, vehicleModel: e.target.value })} 
+                  className="w-full px-3.5 py-2.5 border rounded-xl outline-none" 
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-slate-700 font-bold mb-1">Vehicle Type</label>
+                  <select 
+                    value={postForm.vehicleType} 
+                    onChange={(e) => setPostForm({ ...postForm, vehicleType: e.target.value })} 
+                    className="w-full px-3.5 py-2.5 border rounded-xl outline-none bg-white"
+                  >
+                    <option value="Car">Car</option>
+                    <option value="Van">Van</option>
+                    <option value="SUV">SUV</option>
+                    <option value="Bus">Bus</option>
+                    <option value="Three Wheeler">Three Wheeler</option>
+                    <option value="Bike">Bike</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-slate-700 font-bold mb-1">Service Type</label>
+                  <select 
+                    value={postForm.serviceType} 
+                    onChange={(e) => setPostForm({ ...postForm, serviceType: e.target.value as any })} 
+                    className="w-full px-3.5 py-2.5 border rounded-xl outline-none bg-white"
+                  >
+                    <option value="With driver">With Driver</option>
+                    <option value="Self-drive">Self-drive</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-slate-700 font-bold mb-1">Capacity (Seats)</label>
+                  <input 
+                    type="number" 
+                    min="1" 
+                    required 
+                    value={postForm.capacity} 
+                    onChange={(e) => setPostForm({ ...postForm, capacity: Number(e.target.value) })} 
+                    className="w-full px-3.5 py-2.5 border rounded-xl outline-none" 
+                  />
+                </div>
+                <div>
+                  <label className="block text-slate-700 font-bold mb-1">Location</label>
+                  <input 
+                    type="text" 
+                    required 
+                    placeholder="e.g. Colombo" 
+                    value={postForm.location} 
+                    onChange={(e) => setPostForm({ ...postForm, location: e.target.value })} 
+                    className="w-full px-3.5 py-2.5 border rounded-xl outline-none" 
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-slate-700 font-bold mb-1">Price Per Day (LKR)</label>
+                  <input 
+                    type="number" 
+                    required 
+                    placeholder="e.g. 8000" 
+                    value={postForm.pricePerDay} 
+                    onChange={(e) => setPostForm({ ...postForm, pricePerDay: e.target.value })} 
+                    className="w-full px-3.5 py-2.5 border rounded-xl outline-none" 
+                  />
+                </div>
+                <div>
+                  <label className="block text-slate-700 font-bold mb-1">Price Per Km (Optional)</label>
+                  <input 
+                    type="number" 
+                    placeholder="e.g. 100" 
+                    value={postForm.pricePerKm} 
+                    onChange={(e) => setPostForm({ ...postForm, pricePerKm: e.target.value })} 
+                    className="w-full px-3.5 py-2.5 border rounded-xl outline-none" 
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-slate-700 font-bold mb-1">Owner Contact Number</label>
+                <input 
+                  type="text" 
+                  required 
+                  placeholder="e.g. 0771234567" 
+                  value={postForm.ownerContact} 
+                  onChange={(e) => setPostForm({ ...postForm, ownerContact: e.target.value })} 
+                  className="w-full px-3.5 py-2.5 border rounded-xl outline-none" 
+                />
+              </div>
+
+              <div>
+                <label className="block text-slate-700 font-bold mb-1">Vehicle Image</label>
+                <input 
+                  type="file" 
+                  accept="image/*" 
+                  required 
+                  onChange={(e) => handleImageUpload(e, false)} 
+                  className="w-full text-xs text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-emerald-50 file:text-emerald-700 hover:file:bg-emerald-100" 
+                />
+              </div>
+
+              {postForm.image && (
+                <div className="relative h-32 w-full rounded-xl overflow-hidden bg-slate-100 mt-2">
+                  <img src={postForm.image} alt="Preview" className="h-full w-full object-cover" />
+                </div>
+              )}
+
+              <button 
+                type="submit" 
+                className="w-full bg-emerald-600 hover:bg-emerald-700 text-white py-3 rounded-xl font-bold transition-all shadow-md mt-2"
+              >
+                Submit Vehicle Listing
+              </button>
+            </form>
           </div>
         </div>
       )}
