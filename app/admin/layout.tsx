@@ -19,10 +19,17 @@ export default function AdminLayout({
     role: 'Super Admin',
   });
 
+  // 👈 මෙන්න මෙතැන හැادුවා: LocalStorage Clear කර කෙලින්ම Home Page එකට යැවීම
   const handleLogout = () => {
     setAdmin(null);
     localStorage.removeItem('adminToken');
-    router.push('/login');
+    localStorage.removeItem('token');
+    localStorage.removeItem('userRole');
+    localStorage.removeItem('userEmail');
+    localStorage.removeItem('user');
+    
+    // 404 error එක නොදී හරියටම Home Page එකට යැවීමට
+    window.location.href = '/';
   };
 
   const navLinks = [

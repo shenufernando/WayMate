@@ -2,9 +2,12 @@ const express = require('express');
 const router = express.Router();
 const Vehicle = require('../models/Vehicle');
 
-// 1. User posts a vehicle (User Post Vehicle) -> Default: Pending
+// 1. User posts a vehicle -> Default: Pending
 router.post('/add', async (req, res) => {
   try {
+    if (req.body.ownerEmail) {
+      req.body.ownerEmail = req.body.ownerEmail.toLowerCase().trim();
+    }
     const newVehicle = new Vehicle(req.body);
     const savedVehicle = await newVehicle.save();
     res.status(201).json({ message: "Vehicle submitted for approval!", vehicle: savedVehicle });
@@ -33,7 +36,18 @@ router.get('/all', async (req, res) => {
   }
 });
 
-// 4. Admin Approve / Reject the vehicle status
+// 4. 🔥 Fetch vehicles by Owner Email (Track My Submissions සඳහා අත්‍යවශ්‍යයි)
+router.get('/owner/:email', async (req, res) => {
+  try {
+    const cleanEmail = req.params.email.toLowerCase().trim();
+    const vehicles = await Vehicle.find({ ownerEmail: cleanEmail }).sort({ createdAt: -1 });
+    res.status(200).json(vehicles);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// 5. Admin Approve / Reject the vehicle status
 router.patch('/status/:id', async (req, res) => {
   try {
     const { status } = req.body;
@@ -48,7 +62,7 @@ router.patch('/status/:id', async (req, res) => {
   }
 });
 
-// 5. Delete a vehicle listing by ID
+// 6. Delete a vehicle listing by ID
 router.delete('/:id', async (req, res) => {
   try {
     const deletedVehicle = await Vehicle.findByIdAndDelete(req.params.id);

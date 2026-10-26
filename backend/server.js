@@ -5,7 +5,8 @@ require('dotenv').config();
 
 const authRoutes = require('./routes/authRoutes');
 const attractionRoutes = require('./routes/attractionRoutes');
-const vehicleRoutes = require('./routes/vehicleRoutes'); // 👈 Vehicle routes import කරන ලදී
+const vehicleRoutes = require('./routes/vehicleRoutes');
+const bookingRoutes = require('./routes/bookingRoutes'); // 👈 Booking & Chat routes import කරන ලදී
 
 const app = express();
 
@@ -17,7 +18,8 @@ app.use(cors());
 // Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/attractions', attractionRoutes);
-app.use('/api/vehicles', vehicleRoutes); // 👈 Vehicles සඳහා API route එක එකතු කරන ලදී
+app.use('/api/vehicles', vehicleRoutes);
+app.use('/api/bookings', bookingRoutes); // 👈 Bookings & Chat සඳහා API route එක එකතු කරන ලදී
 
 // MongoDB Connection
 const MONGO_URI = process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/waymate';

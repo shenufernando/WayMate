@@ -2,10 +2,12 @@
 
 import React, { useState, useEffect } from 'react';
 
+// Vehicle interface definition
 interface Vehicle {
   _id: string;
   ownerName: string;
-  ownerContact: string;
+  ownerEmail: string;
+  ownerContact?: string;
   vehicleType: string;
   vehicleModel: string;
   capacity: number;
@@ -15,544 +17,850 @@ interface Vehicle {
   image: string;
   location: string;
   status: 'Pending' | 'Approved' | 'Rejected';
-  features?: string[];
+}
+
+interface Message {
+  _id?: string;
+  sender: 'owner' | 'user';
+  text?: string;
+  image?: string;
+  audio?: string;
+  timestamp: string;
+}
+
+interface Booking {
+  _id: string;
+  vehicleId: string;
+  vehicleModel: string;
+  ownerEmail: string;
+  ownerContact?: string;
+  userName: string;
+  userEmail: string;
+  userContact?: string;
+  pickupDate: string;
+  returnDate: string;
+  destination: string;
+  notes?: string;
+  status: 'Pending' | 'Accepted' | 'Rejected' | 'Cancelled' | 'Completed';
+  messages: Message[];
 }
 
 export default function VehiclesPage() {
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [myListings, setMyListings] = useState<Vehicle[]>([]);
-  const [activeTab, setActiveTab] = useState<'browse' | 'myListings'>('browse');
+  const [incomingBookings, setIncomingBookings] = useState<Booking[]>([]);
+  const [userBookings, setUserBookings] = useState<Booking[]>([]);
+  
+  const [activeTab, setActiveTab] = useState<'browse' | 'myListings' | 'incomingBookings' | 'myBookings'>('browse');
   const [loading, setLoading] = useState<boolean>(true);
   const [isPostModalOpen, setIsPostModalOpen] = useState(false);
   const [selectedVehicle, setSelectedVehicle] = useState<Vehicle | null>(null);
+  const [activeChatBooking, setActiveChatBooking] = useState<Booking | null>(null);
 
-  // Form State for Posting New Vehicle
+  const [currentUserEmail, setCurrentUserEmail] = useState<string>('');
+  const [currentUserName, setCurrentUserName] = useState<string>('');
+
+  // Post form state with ownerContact and auto vehicleType detection
   const [postForm, setPostForm] = useState({
     vehicleModel: '',
     vehicleType: 'Car',
     serviceType: 'With driver',
     capacity: 4,
     ownerName: '',
+    ownerEmail: '',
     ownerContact: '',
     pricePerDay: '',
     pricePerKm: '',
     location: '',
-    image: '',
-    features: ''
+    image: ''
   });
 
-  // 1. Fetch Approved Vehicles for Public Browse
+  // Advanced Booking Form State
+  const [bookingForm, setBookingForm] = useState({
+    userName: '',
+    userEmail: '',
+    userContact: '',
+    pickupDate: '',
+    returnDate: '',
+    destination: '',
+    notes: ''
+  });
+
+  const [isSubmittingBooking, setIsSubmittingBooking] = useState(false);
+
+  const [chatText, setChatText] = useState('');
+  const [chatImage, setChatImage] = useState('');
+  const [recording, setRecording] = useState(false);
+  const [mediaRecorder, setMediaRecorder] = useState<MediaRecorder | null>(null);
+
+  useEffect(() => {
+    const storedUser = localStorage.getItem('user') || localStorage.getItem('waymate_user');
+    const storedEmail = localStorage.getItem('userEmail') || localStorage.getItem('waymate_user_email');
+    const storedName = localStorage.getItem('userName') || localStorage.getItem('userFullName') || 'User';
+
+    let email = '';
+    let name = storedName;
+
+    if (storedUser) {
+      try {
+        const parsed = JSON.parse(storedUser);
+        email = parsed.email || parsed.userEmail || '';
+        name = parsed.fullName || parsed.name || storedName;
+      } catch (e) {
+        console.error('Error parsing user session from localStorage', e);
+      }
+    }
+
+    if (!email && storedEmail) {
+      email = storedEmail;
+    }
+
+    if (email) {
+      const cleanEmail = email.toLowerCase().trim();
+      const cleanName = name && name !== 'User' ? name : storedName;
+
+      setCurrentUserEmail(cleanEmail);
+      setCurrentUserName(cleanName);
+      
+      setPostForm((prev) => ({ ...prev, ownerEmail: cleanEmail, ownerName: cleanName }));
+      setBookingForm((prev) => ({ ...prev, userEmail: cleanEmail, userName: cleanName }));
+      
+      refreshUserData(cleanEmail);
+    }
+
+    fetchApprovedVehicles();
+  }, []);
+
+  const refreshUserData = (email: string) => {
+    if (!email) return;
+    fetchMyListings(email);
+    loadIncomingRequests(email);
+    loadUserBookings(email);
+  };
+
   const fetchApprovedVehicles = async () => {
     try {
       setLoading(true);
-      const response = await fetch('http://localhost:5000/api/vehicles/approved');
-      const data = await response.json();
-      if (Array.isArray(data)) {
-        setVehicles(data);
-      }
-    } catch (error) {
-      console.error('Error fetching approved vehicles:', error);
+      const res = await fetch('http://localhost:5000/api/vehicles/approved');
+      const data = await res.json();
+      if (Array.isArray(data)) setVehicles(data);
+    } catch (err) {
+      console.error('Error fetching approved vehicles:', err);
     } finally {
       setLoading(false);
     }
   };
 
-  // 2. Fetch ALL vehicles to let user track their own posts (Pending, Approved, Rejected)
-  const fetchAllVehiclesForTracking = async () => {
+  const fetchMyListings = async (email: string) => {
     try {
-      const response = await fetch('http://localhost:5000/api/vehicles/all');
-      const data = await response.json();
+      const cleanEmail = email.toLowerCase().trim();
+      const res = await fetch(`http://localhost:5000/api/vehicles/owner/${encodeURIComponent(cleanEmail)}`);
+      const data: Vehicle[] = await res.json();
       if (Array.isArray(data)) {
         setMyListings(data);
+      } else {
+        setMyListings([]);
       }
-    } catch (error) {
-      console.error('Error fetching all listings:', error);
+    } catch (err) {
+      console.error('Error fetching my listings:', err);
+      setMyListings([]);
     }
   };
 
-  useEffect(() => {
-    fetchApprovedVehicles();
-    fetchAllVehiclesForTracking();
-  }, []);
+  const loadIncomingRequests = async (email: string) => {
+    try {
+      const cleanEmail = email.toLowerCase().trim();
+      const res = await fetch(`http://localhost:5000/api/bookings/owner/${encodeURIComponent(cleanEmail)}`);
+      const data = await res.json();
+      if (Array.isArray(data)) setIncomingBookings(data);
+    } catch (err) {
+      console.error('Error fetching incoming requests:', err);
+    }
+  };
 
-  // 3. Handle Image Upload & Convert to Base64
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const loadUserBookings = async (email: string) => {
+    try {
+      const cleanEmail = email.toLowerCase().trim();
+      const res = await fetch(`http://localhost:5000/api/bookings/user/${encodeURIComponent(cleanEmail)}`);
+      const data = await res.json();
+      if (Array.isArray(data)) setUserBookings(data);
+    } catch (err) {
+      console.error('Error fetching user bookings:', err);
+    }
+  };
+
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>, isChat = false) => {
     const file = e.target.files?.[0];
     if (file) {
       const reader = new FileReader();
       reader.onloadend = () => {
-        setPostForm((prev) => ({ ...prev, image: reader.result as string }));
+        if (isChat) {
+          setChatImage(reader.result as string);
+        } else {
+          setPostForm((prev) => ({ ...prev, image: reader.result as string }));
+        }
       };
       reader.readAsDataURL(file);
     }
   };
 
-  // 4. Submit New Vehicle to Backend API
   const handlePostSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    if (!currentUserEmail) {
+      alert('Please login first to post a vehicle!');
+      return;
+    }
     if (!postForm.image) {
-      alert('Please upload an image of the vehicle!');
+      alert('Please upload an image!');
       return;
     }
 
-    const payload = {
-      ownerName: postForm.ownerName,
-      ownerContact: postForm.ownerContact,
-      vehicleType: postForm.vehicleType,
-      vehicleModel: postForm.vehicleModel,
-      capacity: Number(postForm.capacity),
-      serviceType: postForm.serviceType,
-      pricePerDay: Number(postForm.pricePerDay),
-      pricePerKm: postForm.pricePerKm ? Number(postForm.pricePerKm) : 0,
-      location: postForm.location || 'Sri Lanka',
-      image: postForm.image,
-      features: postForm.features ? postForm.features.split(',').map((f) => f.trim()) : []
-    };
-
     try {
-      const response = await fetch('http://localhost:5000/api/vehicles/add', {
+      const payload = {
+        ...postForm,
+        ownerEmail: currentUserEmail.toLowerCase().trim(),
+        ownerName: postForm.ownerName || currentUserName,
+        ownerContact: postForm.ownerContact,
+        vehicleType: postForm.vehicleType,
+        capacity: Number(postForm.capacity),
+        pricePerDay: Number(postForm.pricePerDay),
+        pricePerKm: postForm.pricePerKm ? Number(postForm.pricePerKm) : 0
+      };
+
+      const res = await fetch('http://localhost:5000/api/vehicles/add', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(payload),
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
       });
 
-      if (response.ok) {
-        alert('Your vehicle listing has been submitted successfully! Waiting for Admin approval.');
-        setIsPostModalOpen(false);
-        
-        // Reset Form State
-        setPostForm({
-          vehicleModel: '',
-          vehicleType: 'Car',
-          serviceType: 'With driver',
-          capacity: 4,
-          ownerName: '',
-          ownerContact: '',
-          pricePerDay: '',
-          pricePerKm: '',
-          location: '',
-          image: '',
-          features: ''
-        });
+      const data = await res.json();
 
-        // Refresh Lists
-        fetchApprovedVehicles();
-        fetchAllVehiclesForTracking();
+      if (res.ok) {
+        alert('Vehicle posted successfully! Pending Admin approval.');
+        setIsPostModalOpen(false);
+        refreshUserData(currentUserEmail);
+        setActiveTab('myListings');
       } else {
-        const errData = await response.json();
-        alert(`Failed to submit: ${errData.error || 'Server error'}`);
+        alert('Failed to post vehicle: ' + (data.error || 'Unknown error'));
       }
-    } catch (error) {
-      console.error('Error submitting vehicle:', error);
-      alert('Could not connect to the server. Please ensure Backend is running.');
+    } catch (err) {
+      console.error('Error adding vehicle:', err);
+      alert('Network or server error occurred!');
     }
   };
 
-  // 5. Delete User's Own Vehicle Listing
-  const handleDeleteMyListing = async (id: string, modelName: string) => {
-    const isConfirmed = confirm(`Are you sure you want to delete your submission for "${modelName}"?`);
-    if (!isConfirmed) return;
+  const handleDeleteListing = async (vehicleId: string) => {
+    if (!confirm('Are you sure you want to delete this listing?')) return;
+    try {
+      const res = await fetch(`http://localhost:5000/api/vehicles/${vehicleId}`, { method: 'DELETE' });
+      if (res.ok) {
+        alert('Listing deleted successfully!');
+        refreshUserData(currentUserEmail);
+        fetchApprovedVehicles();
+      }
+    } catch (err) {
+      console.error('Error deleting listing:', err);
+    }
+  };
+
+  // Fixed and Improved Booking Submit Handler with ownerContact included
+  const handleBookingSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!currentUserEmail) {
+      alert('Please login first to book a vehicle!');
+      return;
+    }
+    if (!selectedVehicle) return;
+
+    setIsSubmittingBooking(true);
+
+    const payload = {
+      vehicleId: selectedVehicle._id,
+      vehicleModel: selectedVehicle.vehicleModel,
+      ownerEmail: selectedVehicle.ownerEmail.toLowerCase().trim(),
+      ownerContact: selectedVehicle.ownerContact || 'N/A', // 👈 Added ownerContact to prevent validation error
+      userName: bookingForm.userName || currentUserName,
+      userEmail: currentUserEmail.toLowerCase().trim(),
+      userContact: bookingForm.userContact,
+      pickupDate: bookingForm.pickupDate,
+      returnDate: bookingForm.returnDate,
+      destination: bookingForm.destination,
+      notes: bookingForm.notes
+    };
 
     try {
-      const response = await fetch(`http://localhost:5000/api/vehicles/${id}`, {
-        method: 'DELETE',
+      const res = await fetch('http://localhost:5000/api/bookings/add', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
       });
 
-      if (response.ok) {
-        alert('Your vehicle listing has been deleted successfully!');
-        fetchApprovedVehicles();
-        fetchAllVehiclesForTracking();
+      if (res.ok) {
+        alert('Booking Request sent to Owner successfully!');
+        setSelectedVehicle(null);
+        setBookingForm((prev) => ({
+          ...prev,
+          userContact: '',
+          pickupDate: '',
+          returnDate: '',
+          destination: '',
+          notes: ''
+        }));
+        refreshUserData(currentUserEmail);
+        setActiveTab('myBookings');
       } else {
-        alert('Failed to delete the listing.');
+        const errData = await res.json();
+        alert('Failed to send booking: ' + (errData.error || 'Unknown error'));
       }
-    } catch (error) {
-      console.error('Error deleting vehicle:', error);
-      alert('Server connection error.');
+    } catch (err) {
+      console.error('Error sending booking:', err);
+      alert('Network or server error occurred while sending booking request!');
+    } finally {
+      setIsSubmittingBooking(false);
+    }
+  };
+
+  const handleUpdateBookingStatus = async (bookingId: string, status: string) => {
+    try {
+      const res = await fetch(`http://localhost:5000/api/bookings/status/${bookingId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status })
+      });
+
+      if (res.ok) {
+        alert(`Booking status changed to: ${status}`);
+        if (activeChatBooking && (status === 'Completed' || status === 'Cancelled')) {
+          setActiveChatBooking(null);
+        }
+        refreshUserData(currentUserEmail);
+      }
+    } catch (err) {
+      console.error('Error updating status:', err);
+    }
+  };
+
+  const handleDeleteBooking = async (bookingId: string) => {
+    if (!confirm('Delete this booking request?')) return;
+    try {
+      const res = await fetch(`http://localhost:5000/api/bookings/${bookingId}`, { method: 'DELETE' });
+      if (res.ok) {
+        alert('Booking request deleted!');
+        if (activeChatBooking && activeChatBooking._id === bookingId) {
+          setActiveChatBooking(null);
+        }
+        refreshUserData(currentUserEmail);
+      }
+    } catch (err) {
+      console.error('Error deleting booking:', err);
+    }
+  };
+
+  const sendChatMessage = async (text?: string, image?: string, audio?: string) => {
+    if (!activeChatBooking) return;
+    const isOwner = currentUserEmail === activeChatBooking.ownerEmail.toLowerCase().trim();
+    const role = isOwner ? 'owner' : 'user';
+
+    const msgText = text !== undefined ? text : chatText;
+    const msgImg = image !== undefined ? image : chatImage;
+
+    if (!msgText && !msgImg && !audio) return;
+
+    try {
+      const res = await fetch(`http://localhost:5000/api/bookings/chat/${activeChatBooking._id}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sender: role,
+          text: msgText,
+          image: msgImg,
+          audio: audio || ''
+        })
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        setActiveChatBooking((prev) => prev ? { ...prev, messages: data.messages } : null);
+        setChatText('');
+        setChatImage('');
+      }
+    } catch (err) {
+      console.error('Error sending chat:', err);
     }
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 font-sans pb-16">
-      {/* Header Banner */}
-      <div className="bg-[#0b1329] text-white py-10 px-4 text-center relative shadow-md">
-        <h1 className="text-3xl sm:text-4xl font-black tracking-tight">Private Vehicles & Drivers</h1>
-        <p className="text-slate-300 text-xs sm:text-sm mt-2 max-w-2xl mx-auto">
-          Rent vehicles for self-drive or book verified local drivers across Sri Lanka.
-        </p>
+    <div className="min-h-screen bg-[#f8fafc] font-sans pb-16">
+      <div className="bg-[#0b1329] text-white py-10 px-4 text-center shadow-md">
+        <h1 className="text-3xl font-black">Private Vehicles & Drivers</h1>
+        <p className="text-slate-300 text-xs mt-1">Book vehicles or list your own vehicle.</p>
+
+        <div className="mt-4 max-w-md mx-auto bg-white/10 backdrop-blur-md p-2.5 rounded-2xl flex items-center justify-center text-xs shadow-inner">
+          {currentUserEmail ? (
+            <span>Logged in as: <b className="text-emerald-400">{currentUserName} ({currentUserEmail})</b></span>
+          ) : (
+            <span className="text-amber-300">⚠️ Please login from your account to post or book vehicles.</span>
+          )}
+        </div>
       </div>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Actions Bar & View Toggle Tabs */}
-        <div className="flex flex-col sm:flex-row justify-between items-center mb-8 gap-4 bg-white p-4 rounded-2xl border border-slate-200/80 shadow-sm">
-          <div className="flex items-center gap-2">
+        <div className="flex flex-col sm:flex-row justify-between items-center mb-8 gap-4 bg-white p-3 rounded-2xl shadow-sm border border-slate-100">
+          <div className="flex items-center gap-2 flex-wrap">
             <button
               onClick={() => setActiveTab('browse')}
-              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                activeTab === 'browse'
-                  ? 'bg-emerald-600 text-white shadow-sm'
-                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+              className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all ${
+                activeTab === 'browse' ? 'bg-emerald-600 text-white shadow-md' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
               }`}
             >
               🚗 Browse Approved Vehicles
             </button>
-            <button
-              onClick={() => setActiveTab('myListings')}
-              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                activeTab === 'myListings'
-                  ? 'bg-emerald-600 text-white shadow-sm'
-                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-              }`}
-            >
-              📋 Track My Submissions / Status
-            </button>
+
+            {currentUserEmail && (
+              <button
+                onClick={() => setActiveTab('myListings')}
+                className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all ${
+                  activeTab === 'myListings' ? 'bg-emerald-600 text-white shadow-md' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                }`}
+              >
+                📋 Track My Submissions ({myListings.length})
+              </button>
+            )}
+
+            {currentUserEmail && userBookings.length > 0 && (
+              <button
+                onClick={() => setActiveTab('myBookings')}
+                className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all ${
+                  activeTab === 'myBookings' ? 'bg-emerald-600 text-white shadow-md' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                }`}
+              >
+                📖 My Bookings & Status ({userBookings.length})
+              </button>
+            )}
+
+            {currentUserEmail && myListings.length > 0 && (
+              <button
+                onClick={() => setActiveTab('incomingBookings')}
+                className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all ${
+                  activeTab === 'incomingBookings' ? 'bg-emerald-600 text-white shadow-md' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                }`}
+              >
+                📥 Incoming Requests ({incomingBookings.length})
+              </button>
+            )}
           </div>
 
           <button
-            onClick={() => setIsPostModalOpen(true)}
-            className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs px-5 py-2.5 rounded-xl font-bold transition-all shadow-sm active:scale-95 cursor-pointer flex items-center gap-1.5"
+            onClick={() => {
+              if (!currentUserEmail) {
+                alert('Please login first!');
+                return;
+              }
+              setIsPostModalOpen(true);
+            }}
+            className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs px-5 py-2.5 rounded-xl font-bold shadow-md transition-all active:scale-95"
           >
             ➕ Post Your Vehicle
           </button>
         </div>
 
-        {/* Content Display based on Active Tab */}
         {loading ? (
-          <div className="flex justify-center items-center py-20">
-            <div className="w-10 h-10 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin"></div>
-          </div>
+          <div className="flex justify-center py-20"><div className="w-8 h-8 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin"></div></div>
         ) : (
           <div>
-            {activeTab === 'browse' ? (
-              /* Browse Approved Vehicles */
+            {activeTab === 'browse' && (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {vehicles.length > 0 ? (
-                  vehicles.map((v) => (
-                    <div
-                      key={v._id}
-                      className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm hover:shadow-xl transition-all duration-300 flex flex-col justify-between group"
-                    >
-                      <div>
-                        <div className="relative h-44 w-full overflow-hidden rounded-xl bg-slate-100">
-                          <img
-                            src={v.image}
-                            alt={v.vehicleModel}
-                            className="h-full w-full object-cover group-hover:scale-105 transition-transform duration-500"
-                          />
-                          <span className="absolute top-3 left-3 bg-slate-900/80 backdrop-blur-md text-white text-[10px] font-bold px-2.5 py-1 rounded-md">
-                            {v.serviceType}
-                          </span>
-                          <span className="absolute top-3 right-3 bg-emerald-500 text-white text-[10px] font-bold px-2.5 py-1 rounded-md">
-                            🪑 {v.capacity} Seats
-                          </span>
-                        </div>
-
-                        <div className="mt-4">
-                          <span className="text-[11px] font-bold text-emerald-600 uppercase tracking-wider">{v.vehicleType}</span>
-                          <h3 className="text-lg font-extrabold text-slate-900 leading-snug">{v.vehicleModel}</h3>
-
-                          <p className="text-xs text-slate-500 mt-1">
-                            Owner: <span className="font-semibold text-slate-800">{v.ownerName}</span>
-                          </p>
-
-                          {v.location && (
-                            <p className="text-xs text-slate-400 mt-0.5">📍 {v.location}</p>
-                          )}
-                        </div>
+                {vehicles.map((v) => (
+                  <div key={v._id} className="bg-white rounded-3xl p-5 shadow-sm border border-slate-100 flex flex-col justify-between hover:shadow-md transition-all">
+                    <div>
+                      <div className="relative h-48 w-full overflow-hidden rounded-2xl bg-slate-100">
+                        <img src={v.image} alt={v.vehicleModel} className="h-full w-full object-cover" />
+                        <span className="absolute top-3 left-3 bg-[#1e293b]/90 backdrop-blur-md text-white text-[10px] font-bold px-3 py-1 rounded-full shadow-sm">
+                          {v.serviceType}
+                        </span>
                       </div>
-
-                      <div className="mt-6 pt-3 border-t border-slate-100 flex justify-between items-center">
-                        <div>
-                          <span className="text-emerald-600 font-black text-lg">
-                            LKR {v.pricePerDay?.toLocaleString()}{' '}
-                            <span className="text-[10px] text-slate-500 font-normal">/ day</span>
-                          </span>
-                          {v.pricePerKm ? (
-                            <p className="text-[10px] text-slate-400 font-medium">LKR {v.pricePerKm} per KM</p>
-                          ) : null}
-                        </div>
-
-                        <button
-                          onClick={() => setSelectedVehicle(v)}
-                          className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs px-4 py-2.5 rounded-xl font-bold transition-all shadow-sm active:scale-95 cursor-pointer"
-                        >
-                          Book Request
-                        </button>
+                      <div className="mt-4">
+                        <span className="text-[11px] font-black text-emerald-600 uppercase tracking-wider">{v.vehicleType}</span>
+                        <h3 className="text-lg font-black text-slate-900 mt-0.5">{v.vehicleModel}</h3>
+                        <p className="text-xs text-slate-500 mt-1">Owner: <span className="font-bold text-slate-700">{v.ownerName}</span></p>
+                        {v.ownerContact && <p className="text-xs text-slate-400 mt-0.5">📞 {v.ownerContact}</p>}
+                        <p className="text-xs text-slate-400 mt-0.5">📍 {v.location}</p>
                       </div>
                     </div>
-                  ))
+                    <div className="mt-6 pt-4 border-t border-slate-100 flex justify-between items-center">
+                      <div>
+                        <span className="text-emerald-600 font-black text-lg">LKR {v.pricePerDay?.toLocaleString()}</span>
+                        <span className="text-[10px] text-slate-400 font-normal ml-1">/ day</span>
+                        {v.pricePerKm ? (
+                          <p className="text-[11px] text-slate-500 font-semibold mt-0.5">
+                            + LKR {v.pricePerKm.toLocaleString()} / km
+                          </p>
+                        ) : null}
+                      </div>
+                      <button 
+                        onClick={() => {
+                          setSelectedVehicle(v);
+                          setBookingForm((prev) => ({
+                            ...prev,
+                            userName: currentUserName,
+                            userEmail: currentUserEmail
+                          }));
+                        }} 
+                        className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs px-5 py-2.5 rounded-xl font-bold shadow-sm transition-all active:scale-95"
+                      >
+                        Book Request
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {activeTab === 'myListings' && currentUserEmail && (
+              <div>
+                {myListings.length === 0 ? (
+                  <div className="text-center py-20 bg-white rounded-3xl border border-slate-100 text-slate-400 text-xs">
+                    You haven't posted any vehicles yet. Click "Post Your Vehicle" to add one!
+                  </div>
                 ) : (
-                  <div className="col-span-full text-center py-16 text-slate-400 bg-white rounded-2xl border border-slate-200">
-                    No approved vehicles available at the moment.
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {myListings.map((v) => (
+                      <div key={v._id} className="bg-white rounded-3xl p-5 shadow-sm border border-slate-100 flex flex-col justify-between">
+                        <div>
+                          <div className="relative h-44 w-full rounded-2xl overflow-hidden bg-slate-100">
+                            <img src={v.image} alt={v.vehicleModel} className="h-full w-full object-cover" />
+                            <span className="absolute top-3 left-3 bg-[#1e293b]/90 text-white text-[10px] font-bold px-3 py-1 rounded-full">
+                              {v.serviceType}
+                            </span>
+                            <span className={`absolute top-3 right-3 text-[10px] font-bold px-3 py-1 rounded-full text-white ${
+                              v.status === 'Approved' ? 'bg-emerald-600' : v.status === 'Pending' ? 'bg-amber-500' : 'bg-rose-500'
+                            }`}>
+                              {v.status}
+                            </span>
+                          </div>
+                          <span className="inline-block mt-3 text-[10px] font-black text-emerald-600 uppercase">{v.vehicleType}</span>
+                          <h3 className="text-lg font-black text-slate-900 mt-0.5">{v.vehicleModel}</h3>
+                          <p className="text-xs text-slate-500 mt-1">Location: {v.location}</p>
+                          <p className="text-xs text-slate-500 mt-0.5">Rate: LKR {v.pricePerDay} / day</p>
+                          {v.pricePerKm ? (
+                            <p className="text-[11px] text-slate-500 font-semibold mt-0.5">
+                              + LKR {v.pricePerKm.toLocaleString()} / km
+                            </p>
+                          ) : null}
+                          {v.ownerContact && <p className="text-xs text-slate-500 mt-0.5">Contact: {v.ownerContact}</p>}
+                        </div>
+                        <button onClick={() => handleDeleteListing(v._id)} className="w-full mt-5 bg-rose-600 hover:bg-rose-700 text-white text-xs py-2.5 rounded-xl font-bold transition-all">🗑️ Delete Post</button>
+                      </div>
+                    ))}
                   </div>
                 )}
               </div>
-            ) : (
-              /* Track My Submissions & Status with Delete Option */
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {myListings.length > 0 ? (
-                  myListings.map((v) => (
-                    <div
-                      key={v._id}
-                      className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm flex flex-col justify-between"
-                    >
-                      <div>
-                        <div className="relative h-44 w-full overflow-hidden rounded-xl bg-slate-100">
-                          <img src={v.image} alt={v.vehicleModel} className="h-full w-full object-cover" />
-                          <span className="absolute top-3 left-3 bg-slate-900/80 text-white text-[10px] font-bold px-2 py-1 rounded">
-                            {v.serviceType}
-                          </span>
-                          {/* Status Badge */}
-                          <span
-                            className={`absolute top-3 right-3 text-[10px] font-bold px-2.5 py-1 rounded text-white ${
-                              v.status === 'Approved'
-                                ? 'bg-emerald-600'
-                                : v.status === 'Pending'
-                                ? 'bg-amber-500'
-                                : 'bg-rose-500'
-                            }`}
-                          >
-                            {v.status === 'Pending' && '⏳ Pending Admin Approval'}
-                            {v.status === 'Approved' && '✅ Approved & Live'}
-                            {v.status === 'Rejected' && '❌ Rejected by Admin'}
-                          </span>
-                        </div>
+            )}
 
-                        <div className="mt-4">
-                          <span className="text-[11px] font-bold text-emerald-600 uppercase tracking-wider">{v.vehicleType}</span>
-                          <h3 className="text-lg font-extrabold text-slate-900">{v.vehicleModel}</h3>
-
-                          <div className="mt-2 text-xs text-slate-600 space-y-1 bg-slate-50 p-3 rounded-xl border border-slate-100">
-                            <p>👤 Owner: <span className="font-bold text-slate-800">{v.ownerName}</span></p>
-                            <p>📞 Contact: <span className="font-bold text-slate-800">{v.ownerContact}</span></p>
-                            <p>📍 Location: <span className="font-bold text-slate-800">{v.location}</span></p>
-                            <p>💰 Daily Rate: <span className="font-bold text-emerald-600">LKR {v.pricePerDay?.toLocaleString()}</span></p>
-                          </div>
-                        </div>
-                      </div>
-
-                      <div>
-                        {v.status === 'Rejected' && (
-                          <div className="mt-4 bg-rose-50 border border-rose-200 p-2.5 rounded-xl text-[11px] text-rose-700 font-semibold text-center">
-                            ⚠️ Your listing was rejected by admin.
-                          </div>
-                        )}
-                        {v.status === 'Pending' && (
-                          <div className="mt-4 bg-amber-50 border border-amber-200 p-2.5 rounded-xl text-[11px] text-amber-700 font-semibold text-center">
-                            🕒 Waiting for moderation.
-                          </div>
-                        )}
-
-                        {/* Delete Button for User's Submission */}
-                        <button
-                          onClick={() => handleDeleteMyListing(v._id, v.vehicleModel)}
-                          className="w-full mt-4 bg-rose-600 hover:bg-rose-700 text-white text-xs py-2.5 rounded-xl font-bold transition-all shadow-sm cursor-pointer flex items-center justify-center gap-1.5"
-                        >
-                          🗑️ Delete Listing
-                        </button>
-                      </div>
+            {activeTab === 'myBookings' && currentUserEmail && userBookings.length > 0 && (
+              <div className="space-y-4">
+                <h2 className="text-xl font-black text-slate-800 mb-4">My Booking Requests & Status</h2>
+                {userBookings.map((b) => (
+                  <div key={b._id} className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                    <div>
+                      <span className="text-xs font-bold text-emerald-600 uppercase">{b.vehicleModel}</span>
+                      <h4 className="text-base font-black text-slate-900 mt-1">Owner Email: {b.ownerEmail}</h4>
+                      <p className="text-xs text-slate-500 mt-1">📅 Pickup: <b>{b.pickupDate}</b> | Return: <b>{b.returnDate}</b> | Destination: <b>{b.destination}</b></p>
+                      {b.userContact && <p className="text-xs text-slate-500 mt-0.5">📞 Your Contact: <b>{b.userContact}</b></p>}
+                      <span className={`inline-block mt-3 text-[11px] font-bold px-3 py-1 rounded-full ${
+                        b.status === 'Accepted' ? 'bg-emerald-100 text-emerald-700' : b.status === 'Rejected' ? 'bg-rose-100 text-rose-700' : b.status === 'Cancelled' ? 'bg-slate-200 text-slate-700' : 'bg-amber-100 text-amber-700'
+                      }`}>
+                        Status: {b.status}
+                      </span>
                     </div>
-                  ))
-                ) : (
-                  <div className="col-span-full text-center py-16 text-slate-400 bg-white rounded-2xl border border-slate-200">
-                    You haven't posted any vehicle listings yet.
+
+                    <div className="flex items-center gap-2 flex-wrap">
+                      {b.status === 'Accepted' && (
+                        <>
+                          <button onClick={() => setActiveChatBooking(b)} className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-xl text-xs font-bold shadow-sm">💬 Open Live Chat</button>
+                          <button onClick={() => handleUpdateBookingStatus(b._id, 'Completed')} className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2.5 rounded-xl text-xs font-bold">🏁 Mark Done</button>
+                          <button onClick={() => handleUpdateBookingStatus(b._id, 'Cancelled')} className="bg-amber-600 hover:bg-amber-700 text-white px-4 py-2.5 rounded-xl text-xs font-bold">❌ Cancel</button>
+                        </>
+                      )}
+                      {b.status === 'Pending' && (
+                        <button onClick={() => handleDeleteBooking(b._id)} className="bg-rose-600 hover:bg-rose-700 text-white px-4 py-2.5 rounded-xl text-xs font-bold">🗑️ Cancel Request</button>
+                      )}
+                    </div>
                   </div>
-                )}
+                ))}
+              </div>
+            )}
+
+            {activeTab === 'incomingBookings' && currentUserEmail && myListings.length > 0 && (
+              <div className="space-y-4">
+                <h2 className="text-xl font-black text-slate-800 mb-4">Incoming Requests for Your Vehicles</h2>
+                {incomingBookings.map((b) => (
+                  <div key={b._id} className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-black text-emerald-600 uppercase bg-emerald-50 px-2.5 py-0.5 rounded-lg">{b.vehicleModel}</span>
+                        <span className={`text-[11px] font-bold px-2.5 py-0.5 rounded-full ${
+                          b.status === 'Accepted' ? 'bg-emerald-100 text-emerald-700' : b.status === 'Rejected' ? 'bg-rose-100 text-rose-700' : b.status === 'Cancelled' ? 'bg-slate-200 text-slate-700' : 'bg-amber-100 text-amber-700'
+                        }`}>
+                          {b.status}
+                        </span>
+                      </div>
+                      <h4 className="text-base font-black text-slate-900 mt-2">Booked by: {b.userName} <span className="text-xs font-normal text-slate-500">({b.userEmail})</span></h4>
+                      {b.userContact && <p className="text-xs text-slate-600 font-bold mt-1">📞 Phone / WhatsApp: {b.userContact}</p>}
+                      <p className="text-xs text-slate-500 mt-1">📅 Pickup: <b>{b.pickupDate}</b> | Return: <b>{b.returnDate}</b> | Destination: <b>{b.destination}</b></p>
+                      {b.notes && <p className="text-xs text-slate-500 mt-1 bg-slate-50 p-2 rounded-xl">📝 Notes: {b.notes}</p>}
+                    </div>
+
+                    <div className="flex items-center gap-2 flex-wrap">
+                      {b.status === 'Pending' && (
+                        <>
+                          <button onClick={() => handleUpdateBookingStatus(b._id, 'Accepted')} className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2.5 rounded-xl text-xs font-bold">✅ Accept</button>
+                          <button onClick={() => handleUpdateBookingStatus(b._id, 'Rejected')} className="bg-amber-500 hover:bg-amber-600 text-white px-4 py-2.5 rounded-xl text-xs font-bold">🚫 Reject</button>
+                          <button onClick={() => handleDeleteBooking(b._id)} className="bg-rose-600 hover:bg-rose-700 text-white px-4 py-2.5 rounded-xl text-xs font-bold">🗑️ Delete</button>
+                        </>
+                      )}
+
+                      {b.status === 'Accepted' && (
+                        <>
+                          <button onClick={() => setActiveChatBooking(b)} className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-xl text-xs font-bold">💬 Live Chat</button>
+                          <button onClick={() => handleUpdateBookingStatus(b._id, 'Completed')} className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2.5 rounded-xl text-xs font-bold">🏁 Mark Done</button>
+                          <button onClick={() => handleUpdateBookingStatus(b._id, 'Cancelled')} className="bg-rose-600 hover:bg-rose-700 text-white px-4 py-2.5 rounded-xl text-xs font-bold">❌ Cancel</button>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                ))}
               </div>
             )}
           </div>
         )}
       </main>
 
-      {/* 1. Modal: Post Your Vehicle Form */}
-      {isPostModalOpen && (
+      {/* BOOKING MODAL WITH USER CONTACT AND DETAILS */}
+      {selectedVehicle && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl relative max-h-[90vh] overflow-y-auto">
-            <button
-              onClick={() => setIsPostModalOpen(false)}
-              className="absolute top-4 right-4 text-slate-400 hover:text-slate-800 font-bold text-lg"
-            >
-              ✕
-            </button>
-            <h3 className="text-xl font-black text-slate-800 mb-1">Post Your Vehicle / Driver Service</h3>
-            <p className="text-xs text-slate-500 mb-4">List your vehicle for hire. Admin review required before public listing.</p>
+            <button onClick={() => setSelectedVehicle(null)} className="absolute top-4 right-4 text-slate-400 font-bold">✕</button>
+            <h3 className="text-xl font-black text-slate-800 mb-1">Book Vehicle: {selectedVehicle.vehicleModel}</h3>
+            <p className="text-xs text-slate-500 mb-4">Provide your contact and trip details for the owner.</p>
 
-            <form onSubmit={handlePostSubmit} className="space-y-3 text-xs font-semibold">
+            <form onSubmit={handleBookingSubmit} className="space-y-3 text-xs font-semibold">
               <div>
-                <label className="block text-slate-700 mb-1">Vehicle Model / Name</label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. Toyota Axio / KDH Van"
-                  value={postForm.vehicleModel}
-                  className="w-full px-3 py-2 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-emerald-500"
-                  onChange={(e) => setPostForm({ ...postForm, vehicleModel: e.target.value })}
+                <label className="block text-slate-700 font-bold mb-1">Your Name</label>
+                <input 
+                  type="text" 
+                  required 
+                  value={bookingForm.userName} 
+                  onChange={(e) => setBookingForm({ ...bookingForm, userName: e.target.value })} 
+                  className="w-full px-3.5 py-2.5 border rounded-xl outline-none" 
+                />
+              </div>
+
+              <div>
+                <label className="block text-slate-700 font-bold mb-1">Your Email</label>
+                <input 
+                  type="email" 
+                  disabled 
+                  value={bookingForm.userEmail} 
+                  className="w-full px-3.5 py-2.5 border rounded-xl bg-slate-100 text-slate-500 cursor-not-allowed" 
+                />
+              </div>
+
+              <div>
+                <label className="block text-slate-700 font-bold mb-1">Phone Number / WhatsApp</label>
+                <input 
+                  type="text" 
+                  required 
+                  placeholder="e.g. 0771234567" 
+                  value={bookingForm.userContact} 
+                  onChange={(e) => setBookingForm({ ...bookingForm, userContact: e.target.value })} 
+                  className="w-full px-3.5 py-2.5 border rounded-xl outline-none" 
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-slate-700 mb-1">Service Option</label>
-                  <select
-                    className="w-full px-3 py-2 border border-slate-200 rounded-xl outline-none"
-                    value={postForm.serviceType}
-                    onChange={(e) => setPostForm({ ...postForm, serviceType: e.target.value as any })}
-                  >
-                    <option value="With driver">With Driver</option>
-                    <option value="Self-drive">Self-Drive</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-slate-700 mb-1">Seats Capacity</label>
-                  <input
-                    type="number"
-                    required
-                    value={postForm.capacity}
-                    className="w-full px-3 py-2 border border-slate-200 rounded-xl outline-none"
-                    onChange={(e) => setPostForm({ ...postForm, capacity: Number(e.target.value) })}
+                  <label className="block text-slate-700 font-bold mb-1">Pickup Date</label>
+                  <input 
+                    type="date" 
+                    required 
+                    value={bookingForm.pickupDate} 
+                    onChange={(e) => setBookingForm({ ...bookingForm, pickupDate: e.target.value })} 
+                    className="w-full px-3.5 py-2.5 border rounded-xl outline-none" 
                   />
                 </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-slate-700 mb-1">Daily Rate (LKR)</label>
-                  <input
-                    type="number"
-                    required
-                    placeholder="e.g. 15000"
-                    value={postForm.pricePerDay}
-                    className="w-full px-3 py-2 border border-slate-200 rounded-xl outline-none"
-                    onChange={(e) => setPostForm({ ...postForm, pricePerDay: e.target.value })}
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-slate-700 mb-1">Rate per KM (Optional)</label>
-                  <input
-                    type="number"
-                    placeholder="e.g. 150"
-                    value={postForm.pricePerKm}
-                    className="w-full px-3 py-2 border border-slate-200 rounded-xl outline-none"
-                    onChange={(e) => setPostForm({ ...postForm, pricePerKm: e.target.value })}
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-slate-700 mb-1">Owner Name</label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="Your Name"
-                    value={postForm.ownerName}
-                    className="w-full px-3 py-2 border border-slate-200 rounded-xl outline-none"
-                    onChange={(e) => setPostForm({ ...postForm, ownerName: e.target.value })}
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-slate-700 mb-1">WhatsApp / Contact No</label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="e.g. 0771234567"
-                    value={postForm.ownerContact}
-                    className="w-full px-3 py-2 border border-slate-200 rounded-xl outline-none"
-                    onChange={(e) => setPostForm({ ...postForm, ownerContact: e.target.value })}
+                  <label className="block text-slate-700 font-bold mb-1">Return Date</label>
+                  <input 
+                    type="date" 
+                    required 
+                    value={bookingForm.returnDate} 
+                    onChange={(e) => setBookingForm({ ...bookingForm, returnDate: e.target.value })} 
+                    className="w-full px-3.5 py-2.5 border rounded-xl outline-none" 
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-slate-700 mb-1">Location / City</label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. Colombo, Kandy"
-                  value={postForm.location}
-                  className="w-full px-3 py-2 border border-slate-200 rounded-xl outline-none"
-                  onChange={(e) => setPostForm({ ...postForm, location: e.target.value })}
+                <label className="block text-slate-700 font-bold mb-1">Destination</label>
+                <input 
+                  type="text" 
+                  required 
+                  placeholder="e.g. Kandy / Ella" 
+                  value={bookingForm.destination} 
+                  onChange={(e) => setBookingForm({ ...bookingForm, destination: e.target.value })} 
+                  className="w-full px-3.5 py-2.5 border rounded-xl outline-none" 
                 />
               </div>
 
-              {/* File Image Upload */}
-              <div className="bg-slate-50 p-3 rounded-xl border border-slate-200">
-                <label className="block text-slate-700 mb-1">Upload Vehicle Image</label>
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={handleImageUpload}
-                  className="w-full text-xs text-slate-500 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-emerald-600 file:text-white hover:file:bg-emerald-700 cursor-pointer"
+              <div>
+                <label className="block text-slate-700 font-bold mb-1">Additional Notes</label>
+                <textarea 
+                  rows={2}
+                  placeholder="Any special requirements..." 
+                  value={bookingForm.notes} 
+                  onChange={(e) => setBookingForm({ ...bookingForm, notes: e.target.value })} 
+                  className="w-full px-3.5 py-2.5 border rounded-xl outline-none" 
                 />
-                {postForm.image && (
-                  <div className="mt-2 flex items-center gap-2">
-                    <img src={postForm.image} alt="Preview" className="w-14 h-14 object-cover rounded-lg border" />
-                    <span className="text-[11px] text-emerald-600 font-bold">Image Selected!</span>
-                  </div>
-                )}
               </div>
 
-              <button
-                type="submit"
-                className="w-full bg-emerald-600 hover:bg-emerald-700 text-white py-3 rounded-xl font-bold transition-all shadow-md mt-2 cursor-pointer"
+              <button 
+                type="submit" 
+                disabled={isSubmittingBooking}
+                className="w-full bg-emerald-600 hover:bg-emerald-700 text-white py-3 rounded-xl font-bold transition-all shadow-md mt-2"
               >
-                Submit Listing for Admin Approval
+                {isSubmittingBooking ? 'Sending Request...' : 'Confirm Booking Request'}
               </button>
             </form>
           </div>
         </div>
       )}
 
-      {/* 2. Modal: Booking Request Form */}
-      {selectedVehicle && (
+      {/* POST MODAL WITH AUTO VEHICLE TYPE DETECTION */}
+      {isPostModalOpen && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl relative">
-            <button
-              onClick={() => setSelectedVehicle(null)}
-              className="absolute top-4 right-4 text-slate-400 hover:text-slate-800 font-bold text-lg"
-            >
-              ✕
-            </button>
+          <div className="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl relative max-h-[90vh] overflow-y-auto">
+            <button onClick={() => setIsPostModalOpen(false)} className="absolute top-4 right-4 text-slate-400 font-bold">✕</button>
+            <h3 className="text-xl font-black text-slate-800 mb-1">Post Your Vehicle / Driver Service</h3>
+            <p className="text-xs text-slate-500 mb-4">List your vehicle for hire. Admin review required before public listing.</p>
 
-            <h3 className="text-xl font-black text-slate-800 mb-1">Book Request</h3>
-            <p className="text-xs text-slate-500 mb-4">Requesting: <span className="font-bold text-emerald-600">{selectedVehicle.vehicleModel}</span></p>
+            <form onSubmit={handlePostSubmit} className="space-y-3 text-xs font-semibold">
+              <div>
+                <label className="block text-slate-700 font-bold mb-1">Vehicle Model / Name (Auto detects Car/Van)</label>
+                <input 
+                  type="text" 
+                  required 
+                  placeholder="e.g. Toyota Hiace Van / Aqua" 
+                  value={postForm.vehicleModel} 
+                  onChange={(e) => {
+                    const model = e.target.value;
+                    let vType = 'Car';
+                    const lower = model.toLowerCase();
+                    if (lower.includes('van') || lower.includes('hiace') || lower.includes('kdh')) {
+                      vType = 'Van';
+                    } else if (lower.includes('suv') || lower.includes('jeep') || lower.includes('prado')) {
+                      vType = 'SUV';
+                    } else if (lower.includes('bike') || lower.includes('scooter')) {
+                      vType = 'Bike';
+                    }
+                    setPostForm({ ...postForm, vehicleModel: model, vehicleType: vType });
+                  }} 
+                  className="w-full px-3.5 py-2.5 border rounded-xl outline-none" 
+                />
+              </div>
 
-            <div className="space-y-3 text-xs font-semibold">
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-slate-700 mb-1">Pickup Date</label>
-                  <input type="date" className="w-full px-3 py-2 border border-slate-200 rounded-xl outline-none" />
+                  <label className="block text-slate-700 font-bold mb-1">Service Option</label>
+                  <select value={postForm.serviceType} onChange={(e) => setPostForm({ ...postForm, serviceType: e.target.value as any })} className="w-full px-3.5 py-2.5 border rounded-xl">
+                    <option value="With driver">With Driver</option>
+                    <option value="Self-drive">Self-drive</option>
+                  </select>
                 </div>
                 <div>
-                  <label className="block text-slate-700 mb-1">Return Date</label>
-                  <input type="date" className="w-full px-3 py-2 border border-slate-200 rounded-xl outline-none" />
+                  <label className="block text-slate-700 font-bold mb-1">Seats Capacity</label>
+                  <input type="number" required placeholder="4" value={postForm.capacity} onChange={(e) => setPostForm({ ...postForm, capacity: Number(e.target.value) })} className="w-full px-3.5 py-2.5 border rounded-xl outline-none" />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-slate-700 font-bold mb-1">Daily Rate (LKR)</label>
+                  <input type="number" required placeholder="e.g. 15000" value={postForm.pricePerDay} onChange={(e) => setPostForm({ ...postForm, pricePerDay: e.target.value })} className="w-full px-3.5 py-2.5 border rounded-xl outline-none" />
+                </div>
+                <div>
+                  <label className="block text-slate-700 font-bold mb-1">Rate per KM (Optional)</label>
+                  <input type="number" placeholder="e.g. 150" value={postForm.pricePerKm} onChange={(e) => setPostForm({ ...postForm, pricePerKm: e.target.value })} className="w-full px-3.5 py-2.5 border rounded-xl outline-none" />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-slate-700 font-bold mb-1">Owner Name</label>
+                  <input type="text" required placeholder="Your Name" value={postForm.ownerName} onChange={(e) => setPostForm({ ...postForm, ownerName: e.target.value })} className="w-full px-3.5 py-2.5 border rounded-xl outline-none" />
+                </div>
+                <div>
+                  <label className="block text-slate-700 font-bold mb-1">WhatsApp / Phone No</label>
+                  <input type="text" required placeholder="e.g. 0771234567" value={postForm.ownerContact} onChange={(e) => setPostForm({ ...postForm, ownerContact: e.target.value })} className="w-full px-3.5 py-2.5 border rounded-xl outline-none" />
                 </div>
               </div>
 
               <div>
-                <label className="block text-slate-700 mb-1">Destination / Route</label>
-                <input type="text" placeholder="e.g. Colombo to Ella" className="w-full px-3 py-2 border border-slate-200 rounded-xl outline-none" />
+                <label className="block text-slate-700 font-bold mb-1">Location / City</label>
+                <input type="text" required placeholder="e.g. Colombo" value={postForm.location} onChange={(e) => setPostForm({ ...postForm, location: e.target.value })} className="w-full px-3.5 py-2.5 border rounded-xl outline-none" />
               </div>
 
               <div>
-                <label className="block text-slate-700 mb-1">Special Notes / Passengers</label>
-                <textarea rows={2} placeholder="Any specific requirements..." className="w-full px-3 py-2 border border-slate-200 rounded-xl outline-none" />
+                <label className="block text-slate-700 font-bold mb-1">Vehicle Image</label>
+                <input type="file" accept="image/*" required onChange={(e) => handleImageUpload(e)} className="w-full text-xs" />
               </div>
 
-              <button
-                onClick={() => {
-                  alert(`Booking Request Sent to Owner (${selectedVehicle.ownerName})! Owner Contact: ${selectedVehicle.ownerContact}`);
-                  setSelectedVehicle(null);
-                }}
-                className="w-full bg-emerald-600 hover:bg-emerald-700 text-white py-3 rounded-xl font-bold transition-all shadow-md mt-2 cursor-pointer"
-              >
-                Send Request to Owner
+              <button type="submit" className="w-full bg-emerald-600 hover:bg-emerald-700 text-white py-3 rounded-xl font-bold transition-all shadow-md mt-2">
+                Submit Post for Approval
               </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* LIVE CHAT MODAL */}
+      {activeChatBooking && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl relative flex flex-col h-[80vh]">
+            <div className="flex justify-between items-center pb-3 border-b">
+              <div>
+                <h3 className="text-base font-black text-slate-800">Live Chat: {activeChatBooking.vehicleModel}</h3>
+                <p className="text-[11px] text-slate-500">Status: {activeChatBooking.status}</p>
+              </div>
+              <button onClick={() => setActiveChatBooking(null)} className="text-slate-400 font-bold">✕</button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto py-4 space-y-3">
+              {activeChatBooking.messages?.map((msg, index) => {
+                const isOwner = currentUserEmail === activeChatBooking.ownerEmail.toLowerCase().trim();
+                const isMe = (msg.sender === 'owner' && isOwner) || (msg.sender === 'user' && !isOwner);
+
+                return (
+                  <div key={index} className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}>
+                    <div className={`max-w-[75%] p-3 rounded-2xl text-xs ${isMe ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-800'}`}>
+                      <p>{msg.text}</p>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            <div className="pt-3 border-t flex items-center gap-2">
+              <input 
+                type="text" 
+                placeholder="Type a message..." 
+                value={chatText} 
+                onChange={(e) => setChatText(e.target.value)}
+                className="flex-1 px-3.5 py-2.5 border rounded-xl text-xs outline-none"
+              />
+              <button onClick={() => sendChatMessage()} className="bg-emerald-600 text-white px-4 py-2.5 rounded-xl text-xs font-bold">Send</button>
             </div>
           </div>
         </div>

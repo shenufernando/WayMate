@@ -47,6 +47,7 @@ export default function Home() {
   const [blogs, setBlogs] = useState<BlogPost[]>([]);
   const [loadingBlogs, setLoadingBlogs] = useState<boolean>(true);
 
+  // Function to open authentication modal
   const openAuthModal = (mode: "signin" | "signup") => {
     setAuthMode(mode);
     setEmail("");
@@ -56,6 +57,7 @@ export default function Home() {
     setIsAuthOpen(true);
   };
 
+  // Fetch available rides from backend
   useEffect(() => {
     fetch("http://localhost:5000/api/rides")
       .then((res) => res.json())
@@ -71,6 +73,7 @@ export default function Home() {
       });
   }, []);
 
+  // Fetch travel news blogs from TechCrunch REST API
   useEffect(() => {
     fetch("https://techcrunch.com/wp-json/wp/v2/posts?per_page=3")
       .then((res) => res.json())
@@ -83,9 +86,11 @@ export default function Home() {
       .catch(() => setLoadingBlogs(false));
   }, []);
 
+  // Calculate cost per person for expense splitter
   const costPerPerson =
     totalCost && people > 0 ? (Number(totalCost) / people).toFixed(2) : "0.00";
 
+  // Filter rides based on search criteria
   const filteredRides = rides.filter((ride) => {
     const matchesFrom = ride.from
       .toLowerCase()
@@ -95,16 +100,18 @@ export default function Home() {
     return matchesFrom && matchesTo && matchesDate;
   });
 
+  // Handle Authentication Submission (Sign In & Sign Up)
   const handleAuthSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setAuthLoading(true);
     setAuthMessage(null);
 
-    // Hardcoded Admin Check
+    // Hardcoded Admin Check for testing
     if (authMode === "signin" && email.trim().toLowerCase() === "admin@gmail.com" && password === "admin123") {
       setAuthMessage({ type: "success", text: "Admin Sign-in Successful! Redirecting..." });
       localStorage.setItem("userRole", "admin");
       localStorage.setItem("userEmail", email);
+      localStorage.setItem("user", JSON.stringify({ email: email, fullName: "Admin User" }));
       
       setTimeout(() => {
         setIsAuthOpen(false);
@@ -122,7 +129,7 @@ export default function Home() {
 
       const payload =
         authMode === "signup"
-          ? { name: fullName, email: email.trim(), password }
+          ? { fullName: fullName, email: email.trim(), password }
           : { email: email.trim(), password };
 
       const res = await fetch(endpoint, {
@@ -135,7 +142,6 @@ export default function Home() {
 
       if (res.ok) {
         if (authMode === "signup") {
-          // Register una gaman sign in page ekata maru wela success message eka pennai
           setAuthMessage({ type: "success", text: "Registration Successful! Please Sign In." });
           setPassword("");
           setTimeout(() => {
@@ -143,20 +149,26 @@ export default function Home() {
             setAuthMessage({ type: "success", text: "Please sign in with your registered credentials." });
           }, 1500);
         } else {
-          // Sign in una gaman success kiyala dashboard ekata yai[cite: 5, 6]
           setAuthMessage({ type: "success", text: "Sign-in Successful! Redirecting..." });
 
+          // Store authentication session data in localStorage
           if (data.token) localStorage.setItem("token", data.token);
           localStorage.setItem("userRole", data.user?.role || "user");
-          localStorage.setItem("userName", data.user?.name || fullName);
+          localStorage.setItem("userName", data.user?.fullName || data.user?.name || fullName);
           localStorage.setItem("userEmail", data.user?.email || email);
+          
+          // Save standard 'user' object so the vehicles dashboard can automatically identify the user
+          localStorage.setItem("user", JSON.stringify({
+            email: data.user?.email || email,
+            fullName: data.user?.fullName || data.user?.name || fullName
+          }));
 
           setTimeout(() => {
             setIsAuthOpen(false);
             if (data.user?.role === "admin" || email.trim().toLowerCase() === "admin@gmail.com") {
               router.push("/admin");
             } else {
-              router.push("/user");
+              router.push("/user/vehicles"); // Redirect to user vehicles dashboard
             }
           }, 1500);
         }
@@ -627,69 +639,54 @@ export default function Home() {
 
             {authMessage && (
               <div className={`mb-4 p-3 rounded-xl text-xs font-semibold text-center border ${
-                authMessage.type === "success" 
-                  ? "bg-emerald-50 border-emerald-200 text-emerald-600" 
-                  : "bg-rose-50 border-rose-200 text-rose-600"
+                authMessage.type === "success" ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-rose-50 text-rose-700 border-rose-200"
               }`}>
-                {authMessage.type === "success" ? "✅ " : "⚠️ "}
                 {authMessage.text}
               </div>
             )}
 
-            <form onSubmit={handleAuthSubmit} className="space-y-4" autoComplete="off">
-              <input type="text" name="fake_email_prevent" style={{ display: "none" }} tabIndex={-1} />
-              <input type="password" name="fake_pass_prevent" style={{ display: "none" }} tabIndex={-1} />
-
+            <form onSubmit={handleAuthSubmit} className="space-y-4">
               {authMode === "signup" && (
                 <div>
-                  <label className="block text-sm font-semibold text-slate-700 mb-1">
-                    Full Name
-                  </label>
+                  <label className="block text-xs font-bold text-slate-600 mb-1">Full Name</label>
                   <input
                     type="text"
                     required
-                    autoComplete="off"
+                    placeholder="Enter your full name"
                     value={fullName}
                     onChange={(e) => setFullName(e.target.value)}
-                    placeholder="John Doe"
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                    className="w-full px-4 py-3 rounded-xl border border-slate-200 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500"
                   />
                 </div>
               )}
 
               <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-1">
-                  Email Address
-                </label>
+                <label className="block text-xs font-bold text-slate-600 mb-1">Email Address</label>
                 <input
                   type="email"
                   required
-                  autoComplete="off"
+                  placeholder="Enter your email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="email@example.com"
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  className="w-full px-4 py-3 rounded-xl border border-slate-200 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-1">
-                  Password
-                </label>
+                <label className="block text-xs font-bold text-slate-600 mb-1">Password</label>
                 <div className="relative">
                   <input
                     type={showPassword ? "text" : "password"}
                     required
-                    autoComplete="new-password"
+                    placeholder="Enter your password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    placeholder="••••••••"
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500 pr-16"
+                    className="w-full px-4 py-3 rounded-xl border border-slate-200 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500"
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-600 hover:text-emerald-600 bg-slate-200/60 px-2 py-1 rounded-md"
+                    className="absolute right-3 top-3.5 text-xs text-slate-400 font-bold"
                   >
                     {showPassword ? "Hide" : "Show"}
                   </button>
@@ -699,31 +696,37 @@ export default function Home() {
               <button
                 type="submit"
                 disabled={authLoading}
-                className="w-full bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-400 text-white font-bold py-3 rounded-xl transition-all shadow-md text-sm"
+                className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 rounded-xl transition-all text-xs tracking-wide shadow-md shadow-emerald-600/20"
               >
-                {authLoading ? "Processing..." : authMode === "signin" ? "Sign In" : "Register"}
+                {authLoading ? "Please wait..." : authMode === "signin" ? "Sign In" : "Register"}
               </button>
             </form>
 
-            <div className="mt-6 text-center text-xs text-slate-500">
+            <div className="mt-5 text-center text-xs text-slate-500">
               {authMode === "signin" ? (
                 <p>
                   Don't have an account?{" "}
                   <button
-                    onClick={() => openAuthModal("signup")}
-                    className="text-emerald-600 font-bold hover:underline cursor-pointer bg-transparent border-none"
+                    onClick={() => {
+                      setAuthMode("signup");
+                      setAuthMessage(null);
+                    }}
+                    className="text-emerald-600 font-bold hover:underline"
                   >
-                    Register Here
+                    Sign Up
                   </button>
                 </p>
               ) : (
                 <p>
                   Already have an account?{" "}
                   <button
-                    onClick={() => openAuthModal("signin")}
-                    className="text-emerald-600 font-bold hover:underline cursor-pointer bg-transparent border-none"
+                    onClick={() => {
+                      setAuthMode("signin");
+                      setAuthMessage(null);
+                    }}
+                    className="text-emerald-600 font-bold hover:underline"
                   >
-                    Sign In Here
+                    Sign In
                   </button>
                 </p>
               )}
