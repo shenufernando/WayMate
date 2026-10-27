@@ -6,17 +6,16 @@ import {
   MapPin,
   Calendar,
   Users,
-  Clock,
-  CheckCircle2,
   X,
-  Info,
   ShieldCheck,
   Briefcase,
   AlertCircle,
+  CheckCircle2,
   XCircle,
+  Trash2,
+  Ban,
 } from "lucide-react";
 
-// Types
 interface TourPackage {
   _id: string;
   title: string;
@@ -39,6 +38,7 @@ interface TourBooking {
   userEmail: string;
   bookingDate?: string;
   startDate: string;
+  endDate: string;
   passengers: number;
   totalPrice: number;
   notes?: string;
@@ -48,27 +48,25 @@ interface TourBooking {
 export default function UserToursPage() {
   const [activeTab, setActiveTab] = useState<"browse" | "myBookings">("browse");
   
-  // Search & Filter State
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("All");
 
-  // State for fetched packages & bookings
   const [tours, setTours] = useState<TourPackage[]>([]);
   const [myBookings, setMyBookings] = useState<TourBooking[]>([]);
   const [loading, setLoading] = useState(false);
 
-  // Modals
   const [selectedTour, setSelectedTour] = useState<TourPackage | null>(null);
   const [bookingTour, setBookingTour] = useState<TourPackage | null>(null);
 
-  // Booking Form Fields
+  // Form States
+  const [userName, setUserName] = useState("");
   const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
   const [passengers, setPassengers] = useState(1);
   const [notes, setNotes] = useState("");
 
-  const userEmail = "user@example.com"; // Replace with actual authenticated user email
+  const userEmail = "user@example.com";
 
-  // Updated Categories list matching Admin panel
   const categories = [
     "All",
     "Nature & Hill Country",
@@ -76,11 +74,10 @@ export default function UserToursPage() {
     "Cultural & Heritage",
     "Beach & Coastal Getaways",
     "Wildlife & Safari",
-    "Day Tours & Excursions",
     "Honeymoon & Luxury",
+    "Day Tours & Excursions"
   ];
 
-  // Fetch Tour Packages from Backend API
   useEffect(() => {
     const fetchTours = async () => {
       try {
@@ -97,7 +94,6 @@ export default function UserToursPage() {
     fetchTours();
   }, []);
 
-  // Fetch User Bookings from Backend API
   const fetchMyBookings = async () => {
     setLoading(true);
     try {
@@ -119,7 +115,6 @@ export default function UserToursPage() {
     }
   }, [activeTab]);
 
-  // Filtered Packages
   const filteredTours = tours.filter((tour) => {
     const matchesSearch =
       tour.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -129,7 +124,6 @@ export default function UserToursPage() {
     return matchesSearch && matchesCategory;
   });
 
-  // Handle Submit Booking Request to API
   const handleBookingSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!bookingTour) return;
@@ -138,9 +132,10 @@ export default function UserToursPage() {
       tourId: bookingTour._id,
       tourTitle: bookingTour.title,
       destination: bookingTour.destination,
-      userName: "User Name", // Replace with authenticated user name
+      userName: userName,
       userEmail: userEmail,
       startDate,
+      endDate,
       passengers,
       totalPrice: bookingTour.pricePerPerson * passengers,
       notes,
@@ -156,7 +151,9 @@ export default function UserToursPage() {
       if (response.ok) {
         alert("Booking request submitted successfully!");
         setBookingTour(null);
+        setUserName("");
         setStartDate("");
+        setEndDate("");
         setPassengers(1);
         setNotes("");
         setActiveTab("myBookings");
@@ -166,6 +163,46 @@ export default function UserToursPage() {
     } catch (error) {
       console.error("Error submitting booking:", error);
       alert("Error connecting to server.");
+    }
+  };
+
+  // Cancel Booking
+  const handleCancelBooking = async (id: string) => {
+    if (!confirm("Are you sure you want to cancel this booking?")) return;
+
+    try {
+      const response = await fetch(`http://localhost:5000/api/tours/book/${id}/cancel`, {
+        method: "PUT",
+      });
+
+      if (response.ok) {
+        alert("Booking cancelled successfully!");
+        fetchMyBookings();
+      } else {
+        alert("Failed to cancel booking.");
+      }
+    } catch (error) {
+      console.error("Error cancelling booking:", error);
+    }
+  };
+
+  // Delete Booking
+  const handleDeleteBooking = async (id: string) => {
+    if (!confirm("Are you sure you want to permanently delete this booking?")) return;
+
+    try {
+      const response = await fetch(`http://localhost:5000/api/tours/book/${id}`, {
+        method: "DELETE",
+      });
+
+      if (response.ok) {
+        alert("Booking deleted successfully!");
+        fetchMyBookings();
+      } else {
+        alert("Failed to delete booking.");
+      }
+    } catch (error) {
+      console.error("Error deleting booking:", error);
     }
   };
 
@@ -203,12 +240,9 @@ export default function UserToursPage() {
         </div>
       </div>
 
-      {/* Content Section */}
       <div className="max-w-7xl mx-auto">
-        {/* TAB 1: BROWSE TOURS */}
         {activeTab === "browse" && (
           <div>
-            {/* Filters & Search */}
             <div className="flex flex-col md:flex-row gap-4 mb-6 justify-between items-center bg-white p-4 rounded-xl shadow-sm border border-slate-100">
               <div className="relative w-full md:w-80">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
@@ -238,7 +272,6 @@ export default function UserToursPage() {
               </div>
             </div>
 
-            {/* Tour Package Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {filteredTours.map((tour) => (
                 <div
@@ -302,7 +335,7 @@ export default function UserToursPage() {
           </div>
         )}
 
-        {/* TAB 2: MY BOOKINGS */}
+        {/* MY BOOKINGS TAB */}
         {activeTab === "myBookings" && (
           <div>
             {loading ? (
@@ -352,6 +385,7 @@ export default function UserToursPage() {
                       <h3 className="font-bold text-slate-800 text-base">
                         {b.tourTitle}
                       </h3>
+                      <p className="text-xs text-slate-500">Booked by: <span className="font-semibold text-slate-700">{b.userName}</span></p>
 
                       <div className="flex flex-wrap gap-4 text-xs text-slate-500 mt-2">
                         <span className="flex items-center gap-1">
@@ -360,7 +394,7 @@ export default function UserToursPage() {
                         </span>
                         <span className="flex items-center gap-1">
                           <Calendar className="w-3.5 h-3.5 text-slate-400" />
-                          Start Date: {b.startDate}
+                          {b.startDate} to {b.endDate || "N/A"}
                         </span>
                         <span className="flex items-center gap-1">
                           <Users className="w-3.5 h-3.5 text-slate-400" />
@@ -369,12 +403,30 @@ export default function UserToursPage() {
                       </div>
                     </div>
 
-                    <div className="flex md:flex-col justify-between items-end border-t md:border-t-0 pt-3 md:pt-0 border-slate-100">
+                    <div className="flex flex-col items-end gap-3">
                       <div className="text-right">
                         <span className="text-xs text-slate-400 block">Total Price</span>
                         <span className="text-lg font-extrabold text-slate-800">
                           LKR {b.totalPrice.toLocaleString()}
                         </span>
+                      </div>
+
+                      {/* CANCEL & DELETE BUTTONS */}
+                      <div className="flex gap-2">
+                        {b.status !== "Cancelled" && (
+                          <button
+                            onClick={() => handleCancelBooking(b._id)}
+                            className="px-3 py-1.5 bg-amber-50 text-amber-700 hover:bg-amber-100 text-xs font-semibold rounded-lg transition-colors flex items-center gap-1"
+                          >
+                            <Ban className="w-3.5 h-3.5" /> Cancel
+                          </button>
+                        )}
+                        <button
+                          onClick={() => handleDeleteBooking(b._id)}
+                          className="px-3 py-1.5 bg-rose-50 text-rose-600 hover:bg-rose-100 text-xs font-semibold rounded-lg transition-colors flex items-center gap-1"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" /> Delete
+                        </button>
                       </div>
                     </div>
                   </div>
@@ -384,82 +436,6 @@ export default function UserToursPage() {
           </div>
         )}
       </div>
-
-      {/* PACKAGE DETAILS MODAL */}
-      {selectedTour && (
-        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto p-6 relative shadow-xl">
-            <button
-              onClick={() => setSelectedTour(null)}
-              className="absolute right-4 top-4 text-slate-400 hover:text-slate-600 p-1"
-            >
-              <X className="w-5 h-5" />
-            </button>
-
-            <img
-              src={selectedTour.image}
-              alt={selectedTour.title}
-              className="w-full h-52 object-cover rounded-xl mb-4"
-            />
-
-            <h2 className="text-2xl font-bold text-slate-800 mb-1">
-              {selectedTour.title}
-            </h2>
-            <p className="text-xs text-emerald-600 font-semibold mb-4 flex items-center gap-1">
-              <MapPin className="w-3.5 h-3.5" />
-              {selectedTour.destination} • {selectedTour.duration}
-            </p>
-
-            <p className="text-slate-600 text-sm mb-6">{selectedTour.description}</p>
-
-            {/* Includes */}
-            <div className="mb-6">
-              <h4 className="font-bold text-slate-800 text-sm mb-2">Package Includes:</h4>
-              <div className="grid grid-cols-2 gap-2">
-                {selectedTour.includes.map((inc, i) => (
-                  <div key={i} className="flex items-center gap-2 text-xs text-slate-600">
-                    <ShieldCheck className="w-4 h-4 text-emerald-600" />
-                    {inc}
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Itinerary */}
-            <div className="mb-6">
-              <h4 className="font-bold text-slate-800 text-sm mb-2">Trip Itinerary:</h4>
-              <div className="space-y-3">
-                {selectedTour.itinerary.map((item) => (
-                  <div key={item.day} className="bg-slate-50 p-3 rounded-lg border border-slate-100">
-                    <span className="text-xs font-bold text-emerald-600 block">
-                      Day {item.day}: {item.title}
-                    </span>
-                    <span className="text-xs text-slate-500">{item.desc}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div className="flex justify-between items-center pt-4 border-t border-slate-100">
-              <div>
-                <span className="text-xs text-slate-400 block">Price Per Person</span>
-                <span className="text-xl font-bold text-slate-800">
-                  LKR {selectedTour.pricePerPerson.toLocaleString()}
-                </span>
-              </div>
-              <button
-                onClick={() => {
-                  setBookingTour(selectedTour);
-                  setSelectedTour(null);
-                }}
-                className="px-6 py-2.5 bg-emerald-600 text-white text-xs font-semibold rounded-lg hover:bg-emerald-700 transition-colors"
-              >
-                Proceed to Book
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* BOOKING MODAL FORM */}
       {bookingTour && (
@@ -480,15 +456,43 @@ export default function UserToursPage() {
             <form onSubmit={handleBookingSubmit} className="space-y-4">
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Start Date
+                  Full Name
                 </label>
                 <input
-                  type="date"
+                  type="text"
                   required
-                  value={startDate}
-                  onChange={(e) => setStartDate(e.target.value)}
+                  placeholder="Enter your full name"
+                  value={userName}
+                  onChange={(e) => setUserName(e.target.value)}
                   className="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
                 />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    Start Date
+                  </label>
+                  <input
+                    type="date"
+                    required
+                    value={startDate}
+                    onChange={(e) => setStartDate(e.target.value)}
+                    className="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    End Date
+                  </label>
+                  <input
+                    type="date"
+                    required
+                    value={endDate}
+                    onChange={(e) => setEndDate(e.target.value)}
+                    className="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  />
+                </div>
               </div>
 
               <div>

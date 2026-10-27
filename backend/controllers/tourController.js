@@ -22,7 +22,7 @@ exports.createTourPackage = async (req, res) => {
   }
 };
 
-// 3. Update Tour Package (Admin Side) - 👈 මෙය අලුතින් එකතු විය යුතුය
+// 3. Update Tour Package (Admin Side)
 exports.updateTourPackage = async (req, res) => {
   try {
     const { id } = req.params;
@@ -36,7 +36,7 @@ exports.updateTourPackage = async (req, res) => {
   }
 };
 
-// 4. Delete Tour Package (Admin Side) - 👈 මෙය අලුතින් එකතු විය යුතුය
+// 4. Delete Tour Package (Admin Side)
 exports.deleteTourPackage = async (req, res) => {
   try {
     const { id } = req.params;
@@ -89,6 +89,38 @@ exports.updateBookingStatus = async (req, res) => {
     }
     
     res.status(200).json({ message: `Booking status updated to ${status}`, booking: updatedBooking });
+  } catch (error) {
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
+};
+
+// 8. Cancel Booking Request (User Side) - 👈 අලුතින් එකතු විය
+exports.cancelBooking = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const updatedBooking = await TourBooking.findByIdAndUpdate(
+      id,
+      { status: "Cancelled" },
+      { new: true }
+    );
+    if (!updatedBooking) {
+      return res.status(404).json({ message: "Booking not found" });
+    }
+    res.status(200).json({ message: "Booking cancelled successfully!", booking: updatedBooking });
+  } catch (error) {
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
+};
+
+// 9. Delete Booking Request (User Side) - 👈 අලුතින් එකතු විය
+exports.deleteBooking = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const deletedBooking = await TourBooking.findByIdAndDelete(id);
+    if (!deletedBooking) {
+      return res.status(404).json({ message: "Booking not found" });
+    }
+    res.status(200).json({ message: "Booking deleted successfully!" });
   } catch (error) {
     res.status(500).json({ message: "Server error", error: error.message });
   }
