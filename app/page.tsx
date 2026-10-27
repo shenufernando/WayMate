@@ -168,7 +168,7 @@ export default function Home() {
             if (data.user?.role === "admin" || email.trim().toLowerCase() === "admin@gmail.com") {
               router.push("/admin");
             } else {
-              router.push("/user/vehicles"); // Redirect to user vehicles dashboard
+              router.push("/user"); // Redirect to user Top Attractions dashboard
             }
           }, 1500);
         }
