@@ -3,23 +3,26 @@ const mongoose = require('mongoose');
 const cors = require('cors');
 require('dotenv').config();
 
+// Import Routes
 const authRoutes = require('./routes/authRoutes');
 const attractionRoutes = require('./routes/attractionRoutes');
 const vehicleRoutes = require('./routes/vehicleRoutes');
-const bookingRoutes = require('./routes/bookingRoutes'); // 👈 Booking & Chat routes import කරන ලදී
+const bookingRoutes = require('./routes/bookingRoutes');
+const tourRoutes = require('./routes/tourRoutes'); // 👈 Imported Tour routes
 
 const app = express();
 
-// Middlewares - Base64 Image Uploads සඳහා Payload limit එක 50mb දක්වා වැඩි කර ඇත
+// Middlewares - Increased payload limit to 50mb for Base64 image uploads
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 app.use(cors());
 
-// Routes
+// API Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/attractions', attractionRoutes);
 app.use('/api/vehicles', vehicleRoutes);
-app.use('/api/bookings', bookingRoutes); // 👈 Bookings & Chat සඳහා API route එක එකතු කරන ලදී
+app.use('/api/bookings', bookingRoutes);
+app.use('/api/tours', tourRoutes); // 👈 Added Tour API route
 
 // MongoDB Connection
 const MONGO_URI = process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/waymate';
