@@ -1,28 +1,55 @@
 const express = require('express');
 const router = express.Router();
+
 const { 
   getTours, 
   createTourPackage, 
-  updateTourPackage, 
-  deleteTourPackage, 
+  updateTourPackage,    
+  deleteTourPackage,    
   createBooking, 
   getUserBookings, 
+  getAllBookings,       
   updateBookingStatus,
-  cancelBooking,  // 👈 User Cancel function
-  deleteBooking   // 👈 User Delete function
+  cancelBooking,  
+  deleteBooking   
 } = require('../controllers/tourController');
 
-// Tour Package routes
-router.get('/', getTours);
-router.post('/', createTourPackage);         // Admin Tour Package Creation Route
-router.put('/:id', updateTourPackage);       // Admin Tour Package Update Route
-router.delete('/:id', deleteTourPackage);    // Admin Tour Package Delete Route
+// ==========================
+// Tour Package Routes
+// ==========================
 
-// Booking routes
+// Get all available tour packages
+router.get('/', getTours);
+
+// Create a new tour package (Admin)
+router.post('/', createTourPackage);         
+
+// Update an existing tour package (Admin)
+router.put('/:id', updateTourPackage);       
+
+// Delete a tour package (Admin)
+router.delete('/:id', deleteTourPackage);    
+
+// ==========================
+// Booking Routes
+// ==========================
+
+// Get all tour bookings for admin dashboard management
+router.get('/admin/bookings', getAllBookings); 
+
+// Submit a new booking request (User)
 router.post('/book', createBooking);
+
+// Get all bookings for a specific user by email
 router.get('/user/:email', getUserBookings);
+
+// Update booking status - Accept/Reject (Admin)
 router.put('/book/:id/status', updateBookingStatus);
-router.put('/book/:id/cancel', cancelBooking); // 👈 User Booking Cancel Route
-router.delete('/book/:id', deleteBooking);      // 👈 User Booking Delete Route
+
+// Cancel a specific booking (User)
+router.put('/book/:id/cancel', cancelBooking); 
+
+// Permanently delete a specific booking record (User/Admin)
+router.delete('/book/:id', deleteBooking);      
 
 module.exports = router;

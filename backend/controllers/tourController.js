@@ -1,6 +1,10 @@
 const TourPackage = require('../models/TourPackage');
 const TourBooking = require('../models/TourBooking');
 
+// ==========================
+// Tour Package Controllers
+// ==========================
+
 // 1. Get all Tour Packages
 exports.getTours = async (req, res) => {
   try {
@@ -50,6 +54,10 @@ exports.deleteTourPackage = async (req, res) => {
   }
 };
 
+// ==========================
+// Tour Booking Controllers
+// ==========================
+
 // 5. Save a new Booking Request (User Side)
 exports.createBooking = async (req, res) => {
   try {
@@ -61,7 +69,7 @@ exports.createBooking = async (req, res) => {
   }
 };
 
-// 6. Get Bookings for a specific User
+// 6. Get Bookings for a specific User by Email
 exports.getUserBookings = async (req, res) => {
   try {
     const { email } = req.params;
@@ -72,11 +80,21 @@ exports.getUserBookings = async (req, res) => {
   }
 };
 
-// 7. Update Booking Status by Admin (Accept / Cancel)
+// 7. Get ALL Bookings for Admin Dashboard Management
+exports.getAllBookings = async (req, res) => {
+  try {
+    const bookings = await TourBooking.find().sort({ createdAt: -1 });
+    res.status(200).json(bookings);
+  } catch (error) {
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
+};
+
+// 8. Update Booking Status by Admin (Accept / Reject / Cancel)
 exports.updateBookingStatus = async (req, res) => {
   try {
     const { id } = req.params;
-    const { status } = req.body; // 'Accepted' or 'Cancelled'
+    const { status } = req.body; // 'Accepted', 'Rejected', or 'Cancelled'
     
     const updatedBooking = await TourBooking.findByIdAndUpdate(
       id, 
@@ -94,7 +112,7 @@ exports.updateBookingStatus = async (req, res) => {
   }
 };
 
-// 8. Cancel Booking Request (User Side) - 👈 අලුතින් එකතු විය
+// 9. Cancel Booking Request (User Side)
 exports.cancelBooking = async (req, res) => {
   try {
     const { id } = req.params;
@@ -112,7 +130,7 @@ exports.cancelBooking = async (req, res) => {
   }
 };
 
-// 9. Delete Booking Request (User Side) - 👈 අලුතින් එකතු විය
+// 10. Delete Booking Request (User/Admin Side)
 exports.deleteBooking = async (req, res) => {
   try {
     const { id } = req.params;
