@@ -97,14 +97,14 @@ export default function AdminVehiclesPage() {
 
   return (
     <div className="min-h-screen bg-slate-50 font-sans pb-16">
-      {/* Header Banner */}
-      <div className="bg-slate-900 text-white py-10 px-4 text-center shadow-md">
-        <h1 className="text-3xl font-black tracking-tight">Admin Moderation: Vehicles & Drivers</h1>
-        <p className="text-slate-300 text-xs mt-1">Review, approve, reject, or delete user-submitted vehicle rental listings.</p>
+      {/* Light Header Banner (Matching Manage Attractions layout) */}
+      <div className="pt-2 pb-6">
+        <h1 className="text-3xl font-black text-slate-900 tracking-tight">Manage Vehicles & Drivers</h1>
+        <p className="text-slate-500 text-xs mt-1">Review, approve, reject, or delete user-submitted vehicle rental listings.</p>
       </div>
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Filter Tabs including Delete/Trash view option or filter */}
+      <main className="max-w-7xl mx-auto">
+        {/* Filter Tabs */}
         <div className="flex flex-wrap items-center justify-between gap-4 mb-6 bg-white p-4 rounded-2xl border border-slate-200/80 shadow-sm">
           <div className="flex items-center gap-2">
             {['All', 'Pending', 'Approved', 'Rejected'].map((status) => (

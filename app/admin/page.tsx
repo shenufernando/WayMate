@@ -1,9 +1,52 @@
+'use client';
+
+import { useState, useEffect } from 'react';
+
+interface Stats {
+  totalAttractions: number;
+  registeredDrivers: number;
+  activeTourPackages: number;
+  totalBookings: number;
+}
+
 export default function AdminDashboardPage() {
-  const stats = [
-    { title: 'Total Attractions', count: '48', icon: '🏞️', color: 'bg-blue-500' },
-    { title: 'Registered Drivers', count: '24', icon: '🚘', color: 'bg-emerald-500' },
-    { title: 'Active Tour Packages', count: '12', icon: '🌴', color: 'bg-amber-500' },
-    { title: 'Total Bookings', count: '156', icon: '📑', color: 'bg-purple-500' },
+  const [stats, setStats] = useState<Stats>({
+    totalAttractions: 48,
+    registeredDrivers: 24,
+    activeTourPackages: 12,
+    totalBookings: 156,
+  });
+  const [loading, setLoading] = useState<boolean>(true);
+
+  // Fetch stats from backend API
+  useEffect(() => {
+    const fetchAdminStats = async () => {
+      try {
+        const response = await fetch('http://localhost:5000/api/admin/stats');
+        const data = await response.json();
+        if (response.ok) {
+          setStats({
+            totalAttractions: data.totalAttractions ?? 48,
+            registeredDrivers: data.registeredDrivers ?? 24,
+            activeTourPackages: data.activeTourPackages ?? 12,
+            totalBookings: data.totalBookings ?? 156,
+          });
+        }
+      } catch (error) {
+        console.error('Error fetching admin dashboard stats:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchAdminStats();
+  }, []);
+
+  const statsList = [
+    { title: 'Total Attractions', count: loading ? '...' : stats.totalAttractions, icon: '🏞️', color: 'bg-blue-500' },
+    { title: 'Registered Drivers', count: loading ? '...' : stats.registeredDrivers, icon: '🚘', color: 'bg-emerald-500' },
+    { title: 'Active Tour Packages', count: loading ? '...' : stats.activeTourPackages, icon: '🌴', color: 'bg-amber-500' },
+    { title: 'Total Bookings', count: loading ? '...' : stats.totalBookings, icon: '📑', color: 'bg-purple-500' },
   ];
 
   return (
@@ -16,7 +59,7 @@ export default function AdminDashboardPage() {
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {stats.map((stat, idx) => (
+        {statsList.map((stat, idx) => (
           <div key={idx} className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
             <div>
               <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">{stat.title}</p>

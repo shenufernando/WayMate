@@ -8,7 +8,9 @@ const authRoutes = require('./routes/authRoutes');
 const attractionRoutes = require('./routes/attractionRoutes');
 const vehicleRoutes = require('./routes/vehicleRoutes');
 const bookingRoutes = require('./routes/bookingRoutes');
-const tourRoutes = require('./routes/tourRoutes'); // 👈 Imported Tour routes
+const tourRoutes = require('./routes/tourRoutes');
+const aiRoutes = require('./routes/aiRoutes'); // Imported AI Trip Planner routes
+const adminRoutes = require('./routes/adminRoutes'); // 👈 Imported Admin Dashboard routes
 
 const app = express();
 
@@ -22,7 +24,9 @@ app.use('/api/auth', authRoutes);
 app.use('/api/attractions', attractionRoutes);
 app.use('/api/vehicles', vehicleRoutes);
 app.use('/api/bookings', bookingRoutes);
-app.use('/api/tours', tourRoutes); // 👈 Added Tour API route
+app.use('/api/tours', tourRoutes);
+app.use('/api/ai', aiRoutes); // Added AI Trip Planner API route
+app.use('/api/admin', adminRoutes); // 👈 Added Admin Dashboard API route
 
 // MongoDB Connection
 const MONGO_URI = process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/waymate';

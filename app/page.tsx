@@ -2,18 +2,6 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 
-interface Ride {
-  _id: string;
-  driver: string;
-  from: string;
-  to: string;
-  date: string;
-  seatsLeft: number;
-  pricePerSeat: number;
-  vehicle: string;
-  rating?: string;
-}
-
 interface BlogPost {
   id: number;
   title: { rendered: string };
@@ -41,9 +29,6 @@ export default function Home() {
   const [toSearch, setToSearch] = useState("");
   const [travelDate, setTravelDate] = useState("");
 
-  const [rides, setRides] = useState<Ride[]>([]);
-  const [loadingRides, setLoadingRides] = useState<boolean>(true);
-
   const [blogs, setBlogs] = useState<BlogPost[]>([]);
   const [loadingBlogs, setLoadingBlogs] = useState<boolean>(true);
 
@@ -56,22 +41,6 @@ export default function Home() {
     setAuthMessage(null);
     setIsAuthOpen(true);
   };
-
-  // Fetch available rides from backend
-  useEffect(() => {
-    fetch("http://localhost:5000/api/rides")
-      .then((res) => res.json())
-      .then((data) => {
-        if (Array.isArray(data)) {
-          setRides(data);
-        }
-        setLoadingRides(false);
-      })
-      .catch((err) => {
-        console.error("Error fetching rides:", err);
-        setLoadingRides(false);
-      });
-  }, []);
 
   // Fetch travel news blogs from TechCrunch REST API
   useEffect(() => {
@@ -89,16 +58,6 @@ export default function Home() {
   // Calculate cost per person for expense splitter
   const costPerPerson =
     totalCost && people > 0 ? (Number(totalCost) / people).toFixed(2) : "0.00";
-
-  // Filter rides based on search criteria
-  const filteredRides = rides.filter((ride) => {
-    const matchesFrom = ride.from
-      .toLowerCase()
-      .includes(fromSearch.toLowerCase());
-    const matchesTo = ride.to.toLowerCase().includes(toSearch.toLowerCase());
-    const matchesDate = travelDate ? ride.date === travelDate : true;
-    return matchesFrom && matchesTo && matchesDate;
-  });
 
   // Handle Authentication Submission (Sign In & Sign Up)
   const handleAuthSubmit = async (e: React.FormEvent) => {
@@ -157,7 +116,6 @@ export default function Home() {
           localStorage.setItem("userName", data.user?.fullName || data.user?.name || fullName);
           localStorage.setItem("userEmail", data.user?.email || email);
           
-          // Save standard 'user' object so the vehicles dashboard can automatically identify the user
           localStorage.setItem("user", JSON.stringify({
             email: data.user?.email || email,
             fullName: data.user?.fullName || data.user?.name || fullName
@@ -168,7 +126,7 @@ export default function Home() {
             if (data.user?.role === "admin" || email.trim().toLowerCase() === "admin@gmail.com") {
               router.push("/admin");
             } else {
-              router.push("/user"); // Redirect to user Top Attractions dashboard
+              router.push("/user"); 
             }
           }, 1500);
         }
@@ -196,11 +154,11 @@ export default function Home() {
             <a href="#features" className="hover:text-emerald-600 transition-colors">
               Features
             </a>
-            <a href="#routes" className="hover:text-emerald-600 transition-colors">
-              Find Rides
-            </a>
             <a href="#calculator" className="hover:text-emerald-600 transition-colors">
               Cost Splitter
+            </a>
+            <a href="#about" className="hover:text-emerald-600 transition-colors">
+              About
             </a>
             <a href="#blogs" className="hover:text-emerald-600 transition-colors">
               News
@@ -230,52 +188,21 @@ export default function Home() {
 
           <section className="relative z-10 flex flex-col items-center justify-center text-center pt-20 px-4">
             <span className="bg-emerald-500/20 text-emerald-300 text-xs font-semibold px-4 py-1.5 rounded-full border border-emerald-400/30 backdrop-blur-md mb-4 uppercase tracking-wider">
-              Sri Lanka's #1 Ride Sharing Platform
+              Sri Lanka’s Ultimate All-in-One Travel Companion
             </span>
             <h2 className="text-5xl md:text-6xl font-black text-white leading-tight max-w-4xl drop-shadow-lg tracking-tight">
               Smart Travel &{" "}
               <span className="bg-gradient-to-r from-emerald-400 to-teal-300 bg-clip-text text-transparent">
-                Cost Sharing
-              </span>{" "}
-              Made Easy
+                Companion Platform
+              </span>
             </h2>
-            <p className="text-slate-200 mt-4 max-w-xl text-lg font-normal drop-shadow-md leading-relaxed">
-              Plan your route, find travel mates, split expenses, and explore Sri Lanka together seamlessly.
+            <p className="text-slate-200 mt-4 max-w-2xl text-lg font-normal drop-shadow-md leading-relaxed">
+              Plan custom itineraries with AI, hire private vehicles, book group tours, and explore top attractions — all in one place.
             </p>
-
-            {/* Search Box */}
-            <div className="bg-white/95 backdrop-blur-xl p-3.5 rounded-2xl shadow-2xl mt-10 flex flex-col md:flex-row gap-3 w-full max-w-4xl border border-white/40">
-              <input
-                type="text"
-                placeholder="From (e.g. Colombo)"
-                value={fromSearch}
-                onChange={(e) => setFromSearch(e.target.value)}
-                className="bg-slate-50/80 border border-slate-200/80 rounded-xl px-4 py-3 text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500 flex-1 placeholder:text-slate-400 font-medium text-sm transition-all"
-              />
-              <input
-                type="text"
-                placeholder="To (e.g. Ella)"
-                value={toSearch}
-                onChange={(e) => setToSearch(e.target.value)}
-                className="bg-slate-50/80 border border-slate-200/80 rounded-xl px-4 py-3 text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500 flex-1 placeholder:text-slate-400 font-medium text-sm transition-all"
-              />
-              <input
-                type="date"
-                value={travelDate}
-                onChange={(e) => setTravelDate(e.target.value)}
-                className="bg-slate-50/80 border border-slate-200/80 rounded-xl px-4 py-3 text-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 font-medium text-sm transition-all"
-              />
-              <a
-                href="#routes"
-                className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold px-8 py-3 rounded-xl transition-all text-center flex items-center justify-center shadow-lg shadow-emerald-600/30 text-sm"
-              >
-                Find Matches
-              </a>
-            </div>
           </section>
         </div>
 
-        {/* Features Section */}
+        {/* Features Section (Why WayMate - Updated according to User Dashboard Tabs) */}
         <section id="features" className="mt-28 pt-8 px-6 max-w-7xl mx-auto relative z-20">
           <div className="text-center max-w-3xl mx-auto mb-16">
             <span className="text-emerald-600 font-bold text-xs uppercase tracking-widest bg-emerald-50 px-4 py-1.5 rounded-full border border-emerald-200 inline-block mb-3 shadow-sm">
@@ -285,7 +212,7 @@ export default function Home() {
               Designed for <span className="bg-gradient-to-r from-emerald-600 to-teal-500 bg-clip-text text-transparent">Smarter & Safer</span> Journeys
             </h3>
             <p className="text-slate-500 text-base mt-4 font-normal leading-relaxed">
-              Everything you need to plan, connect, and save money while traveling across Sri Lanka with ease and security.
+              Everything you need to plan, connect, and explore Sri Lanka with complete ease and comfort.
             </p>
           </div>
 
@@ -297,14 +224,11 @@ export default function Home() {
                   🗺️
                 </div>
                 <h4 className="text-xl font-extrabold text-slate-900 mb-3 group-hover:text-emerald-600 transition-colors">
-                  Smart Route Search
+                  Top Attractions
                 </h4>
                 <p className="text-slate-500 text-sm leading-relaxed font-normal">
-                  Discover optimal travel routes across Sri Lanka with real-time seat availability and route matching.
+                  Discover iconic Sri Lankan landmarks, heritage sites, and scenic natural wonders across the island.
                 </p>
-              </div>
-              <div className="mt-8 pt-4 border-t border-slate-100 flex items-center text-xs font-bold text-emerald-600">
-                Explore Routes <span className="ml-1 transition-transform group-hover:translate-x-1">➔</span>
               </div>
             </div>
 
@@ -315,14 +239,11 @@ export default function Home() {
                   🚘
                 </div>
                 <h4 className="text-xl font-extrabold text-slate-900 mb-3 group-hover:text-emerald-600 transition-colors">
-                  Verified Ride Match
+                  Private Vehicles & Drivers
                 </h4>
                 <p className="text-slate-500 text-sm leading-relaxed font-normal">
-                  Connect securely with rated hosts and trustworthy co-travelers heading to your exact destination.
+                  Book verified private rides with experienced drivers or list your own vehicle to offer rides.
                 </p>
-              </div>
-              <div className="mt-8 pt-4 border-t border-slate-100 flex items-center text-xs font-bold text-emerald-600">
-                Find Mates <span className="ml-1 transition-transform group-hover:translate-x-1">➔</span>
               </div>
             </div>
 
@@ -330,17 +251,14 @@ export default function Home() {
               <div className="absolute top-0 right-0 w-28 h-28 bg-emerald-500/5 rounded-bl-full -mr-4 -mt-4 transition-all duration-300 group-hover:scale-110 group-hover:bg-emerald-500/10" />
               <div>
                 <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-emerald-50 to-teal-50 border border-emerald-100 flex items-center justify-center text-emerald-600 text-2xl mb-6 shadow-sm group-hover:scale-110 transition-transform duration-300">
-                  💸
+                  🎒
                 </div>
                 <h4 className="text-xl font-extrabold text-slate-900 mb-3 group-hover:text-emerald-600 transition-colors">
-                  Fair Cost Splitter
+                  Group Tour Packages
                 </h4>
                 <p className="text-slate-500 text-sm leading-relaxed font-normal">
-                  Calculate and split fuel, tolls, and trip expenses transparently with zero hidden fees.
+                  Explore curated group travel packages tailored for hiking, beach getaways, safari, and cultural tours.
                 </p>
-              </div>
-              <div className="mt-8 pt-4 border-t border-slate-100 flex items-center text-xs font-bold text-emerald-600">
-                Split Expenses <span className="ml-1 transition-transform group-hover:translate-x-1">➔</span>
               </div>
             </div>
 
@@ -351,96 +269,14 @@ export default function Home() {
                   🤖
                 </div>
                 <h4 className="text-xl font-extrabold text-slate-900 mb-3 group-hover:text-emerald-600 transition-colors">
-                  AI Itinerary Planner
+                  AI Trip Planner
                 </h4>
                 <p className="text-slate-500 text-sm leading-relaxed font-normal">
-                  Get personalized day-by-day travel plans tailored specifically to your budget and interests.
+                  Generate instant, personalized day-by-day travel itineraries based on your budget and preferences.
                 </p>
               </div>
-              <div className="mt-8 pt-4 border-t border-slate-100 flex items-center text-xs font-bold text-emerald-600">
-                Plan Trip <span className="ml-1 transition-transform group-hover:translate-x-1">➔</span>
-              </div>
             </div>
           </div>
-        </section>
-
-        {/* Available Rides Section */}
-        <section id="routes" className="mt-32 px-4 max-w-6xl mx-auto">
-          <div className="text-center mb-12">
-            <span className="text-emerald-600 font-bold text-xs uppercase tracking-widest bg-emerald-50 px-3 py-1 rounded-full border border-emerald-200">
-              Verified Trips
-            </span>
-            <h3 className="text-3xl md:text-4xl font-black text-slate-900 mt-3 tracking-tight">
-              Available <span className="text-emerald-600">Rides & Travel Mates</span>
-            </h3>
-            <p className="text-slate-500 text-sm mt-2 max-w-md mx-auto">
-              Find verified drivers and fellow travelers sharing costs on your route.
-            </p>
-          </div>
-
-          {loadingRides ? (
-            <div className="flex justify-center items-center py-16">
-              <div className="w-8 h-8 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin"></div>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-              {filteredRides.length > 0 ? (
-                filteredRides.map((ride) => (
-                  <div
-                    key={ride._id}
-                    className="bg-white border border-slate-200/80 rounded-2xl p-6 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 flex flex-col justify-between group"
-                  >
-                    <div>
-                      <div className="flex justify-between items-center mb-5">
-                        <span className="bg-emerald-50 text-emerald-700 text-xs px-3 py-1 rounded-lg font-bold border border-emerald-200/60 flex items-center gap-1.5">
-                          <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                          {ride.vehicle}
-                        </span>
-                        <span className="text-xs font-bold text-slate-600 bg-slate-100 px-2.5 py-1 rounded-lg flex items-center gap-1">
-                          ⭐ {ride.rating || "4.8"}
-                        </span>
-                      </div>
-
-                      <div className="mb-6">
-                        <div className="flex items-center gap-2 text-xs text-slate-400 font-medium mb-1">
-                          <span>📅 {ride.date}</span>
-                        </div>
-                        <h4 className="text-2xl font-black text-slate-900 tracking-tight group-hover:text-emerald-600 transition-colors">
-                          {ride.from} <span className="text-emerald-500 font-normal">➔</span> {ride.to}
-                        </h4>
-                        <p className="text-xs text-slate-500 mt-1 font-medium flex items-center gap-1">
-                          <span>👤 Host:</span> <strong className="text-slate-700">{ride.driver}</strong>
-                        </p>
-                      </div>
-
-                      <div className="bg-slate-50 rounded-xl p-3.5 border border-slate-100 flex justify-between items-center text-sm mb-6">
-                        <div>
-                          <span className="text-slate-400 block text-xs font-medium">Seats Left</span>
-                          <span className="font-extrabold text-emerald-600 text-sm">{ride.seatsLeft} Seats</span>
-                        </div>
-                        <div className="h-8 w-px bg-slate-200"></div>
-                        <div className="text-right">
-                          <span className="text-slate-400 block text-xs font-medium">Price / Seat</span>
-                          <span className="font-black text-slate-900 text-base">Rs. {Number(ride.pricePerSeat).toLocaleString()}</span>
-                        </div>
-                      </div>
-                    </div>
-
-                    <button
-                      onClick={() => alert(`Booking request sent to ${ride.driver}!`)}
-                      className="w-full bg-slate-900 hover:bg-emerald-600 text-white font-bold py-3.5 rounded-xl transition-all duration-300 text-sm shadow-md shadow-slate-900/10 group-hover:shadow-emerald-600/20"
-                    >
-                      Request to Join
-                    </button>
-                  </div>
-                ))
-              ) : (
-                <div className="col-span-full text-center py-16 text-slate-400 bg-white rounded-2xl border border-slate-200/80 shadow-sm">
-                  No rides found matching your search parameters.
-                </div>
-              )}
-            </div>
-          )}
         </section>
 
         {/* Expense Calculator */}
@@ -505,6 +341,23 @@ export default function Home() {
                   </span>
                 </div>
               </div>
+            </div>
+          </div>
+        </section>
+
+        {/* About Us Section */}
+        <section id="about" className="mt-32 px-6 max-w-6xl mx-auto">
+          <div className="bg-white rounded-3xl p-8 md:p-12 border border-slate-200/80 shadow-sm relative overflow-hidden">
+            <div className="max-w-3xl mx-auto text-center space-y-4">
+              <span className="text-emerald-600 font-bold text-xs uppercase tracking-widest bg-emerald-50 px-4 py-1.5 rounded-full border border-emerald-200 inline-block shadow-sm">
+                About WayMate
+              </span>
+              <h3 className="text-3xl md:text-4xl font-black text-slate-900 tracking-tight">
+                Empowering Travel Across Sri Lanka
+              </h3>
+              <p className="text-slate-600 text-sm md:text-base leading-relaxed">
+                WayMate is Sri Lanka’s premier travel platform designed to make island exploration effortless, affordable, and smart. Whether you want to discover top attractions, hire verified private vehicles, join curated group tour packages, or let artificial intelligence plan your entire journey, WayMate brings all your travel needs into one seamless ecosystem.
+              </p>
             </div>
           </div>
         </section>
@@ -579,8 +432,8 @@ export default function Home() {
               <h4 className="text-white font-bold mb-4 text-base">Quick Links</h4>
               <ul className="space-y-2.5 text-sm">
                 <li><a href="#features" className="hover:text-emerald-400 transition-colors">Features</a></li>
-                <li><a href="#routes" className="hover:text-emerald-400 transition-colors">Find Rides</a></li>
                 <li><a href="#calculator" className="hover:text-emerald-400 transition-colors">Cost Splitter</a></li>
+                <li><a href="#about" className="hover:text-emerald-400 transition-colors">About Us</a></li>
                 <li><a href="#blogs" className="hover:text-emerald-400 transition-colors">Travel News</a></li>
               </ul>
             </div>
@@ -624,23 +477,32 @@ export default function Home() {
 
       {/* Auth Modal (Sign In / Register UI) */}
       {isAuthOpen && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className="bg-white border border-slate-200 w-full max-w-md p-6 rounded-2xl shadow-2xl relative">
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-3xl max-w-md w-full p-8 shadow-2xl relative border border-slate-100">
             <button
               onClick={() => setIsAuthOpen(false)}
-              className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 text-xl font-bold"
+              className="absolute top-6 right-6 text-slate-400 hover:text-slate-700 font-bold text-xl"
             >
               ✕
             </button>
 
-            <h3 className="text-2xl font-bold text-slate-800 text-center mb-6">
+            <h3 className="text-2xl font-black text-slate-900 mb-2">
               {authMode === "signin" ? "Welcome Back" : "Create Account"}
             </h3>
+            <p className="text-xs text-slate-500 mb-6">
+              {authMode === "signin"
+                ? "Enter your credentials to access your account."
+                : "Sign up to start sharing rides and splitting travel costs."}
+            </p>
 
             {authMessage && (
-              <div className={`mb-4 p-3 rounded-xl text-xs font-semibold text-center border ${
-                authMessage.type === "success" ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-rose-50 text-rose-700 border-rose-200"
-              }`}>
+              <div
+                className={`p-3 rounded-xl text-xs font-semibold mb-4 text-center ${
+                  authMessage.type === "success"
+                    ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                    : "bg-rose-50 text-rose-700 border border-rose-200"
+                }`}
+              >
                 {authMessage.text}
               </div>
             )}
@@ -648,45 +510,45 @@ export default function Home() {
             <form onSubmit={handleAuthSubmit} className="space-y-4">
               {authMode === "signup" && (
                 <div>
-                  <label className="block text-xs font-bold text-slate-600 mb-1">Full Name</label>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">Full Name</label>
                   <input
                     type="text"
                     required
-                    placeholder="Enter your full name"
                     value={fullName}
                     onChange={(e) => setFullName(e.target.value)}
-                    className="w-full px-4 py-3 rounded-xl border border-slate-200 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                    placeholder="John Doe"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
                   />
                 </div>
               )}
 
               <div>
-                <label className="block text-xs font-bold text-slate-600 mb-1">Email Address</label>
+                <label className="block text-xs font-bold text-slate-700 mb-1">Email Address</label>
                 <input
                   type="email"
                   required
-                  placeholder="Enter your email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="w-full px-4 py-3 rounded-xl border border-slate-200 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  placeholder="name@example.com"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-600 mb-1">Password</label>
+                <label className="block text-xs font-bold text-slate-700 mb-1">Password</label>
                 <div className="relative">
                   <input
                     type={showPassword ? "text" : "password"}
                     required
-                    placeholder="Enter your password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    className="w-full px-4 py-3 rounded-xl border border-slate-200 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                    placeholder="••••••••"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-3.5 text-xs text-slate-400 font-bold"
+                    className="absolute right-4 top-3.5 text-xs text-slate-400 font-bold hover:text-slate-600"
                   >
                     {showPassword ? "Hide" : "Show"}
                   </button>
@@ -696,13 +558,13 @@ export default function Home() {
               <button
                 type="submit"
                 disabled={authLoading}
-                className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 rounded-xl transition-all text-xs tracking-wide shadow-md shadow-emerald-600/20"
+                className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3.5 rounded-xl transition-all shadow-lg shadow-emerald-600/20 text-sm mt-2 disabled:opacity-50"
               >
                 {authLoading ? "Please wait..." : authMode === "signin" ? "Sign In" : "Register"}
               </button>
             </form>
 
-            <div className="mt-5 text-center text-xs text-slate-500">
+            <div className="mt-6 text-center text-xs text-slate-500">
               {authMode === "signin" ? (
                 <p>
                   Don't have an account?{" "}
@@ -713,7 +575,7 @@ export default function Home() {
                     }}
                     className="text-emerald-600 font-bold hover:underline"
                   >
-                    Sign Up
+                    Register
                   </button>
                 </p>
               ) : (
