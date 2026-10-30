@@ -40,6 +40,7 @@ export default function AITripPlannerPage() {
     "Scenic Photography"
   ];
 
+  // Handle interest selection toggle
   const handleInterestToggle = (item: string) => {
     if (interests.includes(item)) {
       setInterests(interests.filter((i) => i !== item));
@@ -48,6 +49,7 @@ export default function AITripPlannerPage() {
     }
   };
 
+  // Handle generating trip plan by sending request to backend AI endpoint
   const handleGeneratePlan = async () => {
     if (!destination) {
       alert("Please enter a destination!");
@@ -94,7 +96,7 @@ export default function AITripPlannerPage() {
       </div>
 
       <div className="relative z-10 max-w-4xl w-full mx-auto">
-        {/* Header */}
+        {/* Header Section */}
         <div className="text-center mb-8">
           <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-xs font-bold mb-3 shadow-sm">
             <Sparkles className="w-4 h-4 text-emerald-400" /> WayMate AI Engine
@@ -111,14 +113,12 @@ export default function AITripPlannerPage() {
         {step < 3 && (
           <div className="bg-white/95 backdrop-blur-md rounded-2xl shadow-xl border border-white/20 p-6 md:p-8">
             <div className="flex items-center justify-between mb-8 pb-4 border-b border-slate-100">
-              <span className={`text-xs font-bold ${step === 1 ? 'text-emerald-600' : 'text-slate-400'}`}>
-                1. Destination & Travelers
-              </span>
-              <span className={`text-xs font-bold ${step === 2 ? 'text-emerald-600' : 'text-slate-400'}`}>
-                2. Budget (LKR) & Vibe
+              <span className="text-xs font-bold text-emerald-600">
+                {step === 1 ? '1. Destination & Travelers' : '2. Budget (LKR) & Vibe'}
               </span>
             </div>
 
+            {/* Step 1 Form Fields */}
             {step === 1 && (
               <div className="space-y-6">
                 <div>
@@ -177,6 +177,7 @@ export default function AITripPlannerPage() {
               </div>
             )}
 
+            {/* Step 2 Form Fields */}
             {step === 2 && (
               <div className="space-y-6">
                 <div>
@@ -255,25 +256,13 @@ export default function AITripPlannerPage() {
         {step === 3 && aiPlan && (
           <div className="bg-white/95 backdrop-blur-md rounded-2xl shadow-xl border border-white/20 p-6 md:p-8 space-y-6">
             
-            {/* Dynamic Destination Image Mapping (Fallbacks to correct Sri Lankan destination photos if AI link varies) */}
-            <div 
-              className="relative h-72 md:h-80 rounded-2xl overflow-hidden shadow-lg bg-cover bg-center"
-              style={{ 
-                backgroundImage: `url(${
-                  aiPlan.imageUrl || (
-                    aiPlan.destination?.toLowerCase().includes('kandy') 
-                      ? 'https://images.unsplash.com/photo-1544735716-392fe2489ffa?q=80&w=1920&auto=format&fit=crop'
-                      : aiPlan.destination?.toLowerCase().includes('ella')
-                      ? 'https://images.unsplash.com/photo-1578592598172-17804a524a91?q=80&w=1920&auto=format&fit=crop'
-                      : aiPlan.destination?.toLowerCase().includes('galle')
-                      ? 'https://images.unsplash.com/photo-1588598124484-e91b10a6ded3?q=80&w=1920&auto=format&fit=crop'
-                      : aiPlan.destination?.toLowerCase().includes('colombo')
-                      ? 'https://images.unsplash.com/photo-1589182337358-2fabedd73f9d?q=80&w=1920&auto=format&fit=crop'
-                      : 'https://images.unsplash.com/photo-1546708973-b339540b5162?q=80&w=1920&auto=format&fit=crop'
-                  )
-                })` 
-              }}
-            >
+            {/* Target Banner Image Area Only */}
+            <div className="relative h-72 md:h-80 rounded-2xl overflow-hidden shadow-lg bg-slate-900">
+              <img 
+                src="https://www.ceylontraveldream.com/images/sri-lanka-tours/sri-lanka-tours.jpg" 
+                alt={aiPlan.destination || "Destination"}
+                className="w-full h-full object-cover"
+              />
               <div className="absolute inset-0 bg-gradient-to-t from-slate-950/90 via-slate-900/40 to-black/20 flex flex-col justify-end p-6 md:p-8 text-white">
                 <span className="text-xs bg-emerald-500 text-white font-bold px-3 py-1 rounded-full w-fit mb-2 shadow-sm border border-emerald-400/30">
                   ✨ AI Generated Itinerary
@@ -310,7 +299,6 @@ export default function AITripPlannerPage() {
                   <Download className="w-3.5 h-3.5 text-slate-500" /> Download PDF
                 </button>
                 
-                {/* Book with WayMate button linking to Private Vehicles & Drivers page */}
                 <a
                   href="/vehicles"
                   className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg transition flex items-center gap-1.5 shadow-sm"
@@ -320,7 +308,7 @@ export default function AITripPlannerPage() {
               </div>
             </div>
 
-            {/* Itinerary Details with Timings */}
+            {/* Itinerary Details */}
             <div className="space-y-4">
               {aiPlan.itinerary.map((dayItem: any) => (
                 <div key={dayItem.day} className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm">

@@ -1,4 +1,3 @@
-// backend/controllers/aiController.js
 const { GoogleGenerativeAI } = require("@google/generative-ai");
 
 // Initialize Gemini AI with API Key
@@ -16,33 +15,8 @@ exports.generateTripPlan = async (req, res) => {
       ? interests.join(", ") 
       : "General Exploration";
 
-    // Comprehensive Sri Lanka Destination Image Mapping (Real Unsplash HD Links)
-    const destLower = destination.toLowerCase();
-    let imageUrl = "https://images.unsplash.com/photo-1546708973-b339540b5162?q=80&w=1920&auto=format&fit=crop";
-
-    if (destLower.includes("kandy")) {
-      imageUrl = "https://images.unsplash.com/photo-1544735716-392fe2489ffa?q=80&w=1920&auto=format&fit=crop";
-    } else if (destLower.includes("ella")) {
-      imageUrl = "https://images.unsplash.com/photo-1578592598172-17804a524a91?q=80&w=1920&auto=format&fit=crop";
-    } else if (destLower.includes("galle")) {
-      imageUrl = "https://images.unsplash.com/photo-1588598124484-e91b10a6ded3?q=80&w=1920&auto=format&fit=crop";
-    } else if (destLower.includes("nuwara eliya") || destLower.includes("nuwara")) {
-      imageUrl = "https://images.unsplash.com/photo-1596401057633-54a8ad8d5d08?q=80&w=1920&auto=format&fit=crop";
-    } else if (destLower.includes("sigiriya") || destLower.includes("dambulla")) {
-      imageUrl = "https://images.unsplash.com/photo-1580674684081-7617fbf3d745?q=80&w=1920&auto=format&fit=crop";
-    } else if (destLower.includes("colombo")) {
-      imageUrl = "https://images.unsplash.com/photo-1589182337358-2fabedd73f9d?q=80&w=1920&auto=format&fit=crop";
-    } else if (destLower.includes("mirissa") || destLower.includes("bentota") || destLower.includes("hikkaduwa")) {
-      imageUrl = "https://images.unsplash.com/photo-1512100356356-de1b84283e18?q=80&w=1920&auto=format&fit=crop";
-    } else if (destLower.includes("yala") || destLower.includes("udawalawe") || destLower.includes("wilpattu")) {
-      imageUrl = "https://images.unsplash.com/photo-1547471080-7cc2caa01a7e?q=80&w=1920&auto=format&fit=crop";
-    } else if (destLower.includes("trincomalee") || destLower.includes("pasikudah") || destLower.includes("arugam")) {
-      imageUrl = "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?q=80&w=1920&auto=format&fit=crop";
-    } else if (destLower.includes("jaffna")) {
-      imageUrl = "https://images.unsplash.com/photo-1588599320442-a950561cc7d4?q=80&w=1920&auto=format&fit=crop";
-    } else if (destLower.includes("anuradhapura") || destLower.includes("polonnaruwa")) {
-      imageUrl = "https://images.unsplash.com/photo-1609828913662-8588ab23b8f1?q=80&w=1920&auto=format&fit=crop";
-    }
+    // Set the user provided direct image link specifically for the banner
+    const imageUrl = "https://www.ceylontraveldream.com/images/sri-lanka-tours/sri-lanka-tours.jpg";
 
     const prompt = `
     You are an expert Sri Lanka travel guide for WayMate application.
@@ -72,7 +46,6 @@ exports.generateTripPlan = async (req, res) => {
     }
     `;
 
-    // Huutoro model moɗiiɗo mo alaa caɗeele (Stable Model)
     const model = genAI.getGenerativeModel({ model: "gemini-3.6-flash" });
     const result = await model.generateContent(prompt);
     const responseText = result.response.text();
