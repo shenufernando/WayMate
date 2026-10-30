@@ -19,7 +19,7 @@ router.get('/owner/:identifier', async (req, res) => {
   try {
     const identifier = req.params.identifier.toLowerCase().trim();
     
-    // අයිතිකරුගේ ඊමේල් එක හෝ කන්ටැක්ට් එක මඟින් අදාළ වාහන සෙවීම
+    // Searching for relevant vehicles using the owner's email or contact information
     const vehicles = await Vehicle.find({
       $or: [
         { ownerEmail: identifier },
@@ -28,7 +28,7 @@ router.get('/owner/:identifier', async (req, res) => {
     });
     const vehicleIds = vehicles.map(v => v._id);
 
-    // ඊමේල් එකෙන්, කන්ටැක්ට් එකෙන් හෝ වාහන ID හරහා එන සියලුම බුකින් ඉල්ලීම් ලබා ගැනීම
+    // Receiving all booking requests that come via email, contact, or vehicle ID.
     const bookings = await Booking.find({
       $or: [
         { ownerEmail: identifier },

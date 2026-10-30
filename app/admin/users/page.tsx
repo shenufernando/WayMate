@@ -33,7 +33,7 @@ const UserManagement = () => {
     try {
       setLoading(true);
       const res = await axios.get("http://localhost:5000/api/auth");
-      // Backend එකෙන් එන ඩේටා structure එකට අනුව සකස් කරන ලදී
+      // Prepared according to the data structure coming from the backend
       setUsers(res.data.data || res.data);
     } catch (error) {
       console.error("Error fetching users:", error);
